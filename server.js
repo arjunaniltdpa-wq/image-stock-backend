@@ -3,56 +3,53 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import B2 from "backblaze-b2";
 import multer from "multer";
+import cors from "cors";
 import imageRoutes from "./routes/imageRoutes.js"; // Import API routes
 import Image from "./models/Image.js"; // Import Image model
-import cors from "cors";
 
 dotenv.config();
 
-const app = express(); // <-- Initialize app first
-
-app.use(cors({
-  origin: "*", // You can later restrict to your Vercel URL
-}));
-
-app.use(express.json());
-
-console.log("MONGO_URI:", process.env.MONGO_URI);
+const app = express();
 
 // -------------------
-// 1️⃣ MongoDB connection
+// Middleware
+// -------------------
+app.use(cors({
+  origin: "*", // Later you can restrict to your Vercel frontend URL
+}));
+app.use(express.json());
+
+// -------------------
+// MongoDB connection
 // -------------------
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
 // -------------------
-// 2️⃣ Backblaze B2 setup
+// Backblaze B2 setup
 // -------------------
 const b2 = new B2({
-  applicationKeyId: process.env.BACKBLAZE_KEY_ID, // Backblaze Dashboard-ൽ നിന്നുള്ള Key ID
-  applicationKey: process.env.BACKBLAZE_APP_KEY   // Application Key
+  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
+  applicationKey: process.env.BACKBLAZE_APP_KEY
 });
 
-await b2.authorize(); // ✅ കീകൾ ശരിയാണെങ്കിൽ ഇത് സക്സസ്സ് ആവും
-
-
 // -------------------
-// 3️⃣ Async init function
+// Async init function
 // -------------------
 async function init() {
   try {
-    // Authorize Backblaze
+    // Authorize B2
     await b2.authorize();
     console.log("✅ Backblaze authorized");
 
     // -------------------
-    // 4️⃣ Multer setup for file uploads
+    // Multer setup for file uploads
     // -------------------
     const upload = multer({ storage: multer.memoryStorage() });
 
     // -------------------
-    // 5️⃣ Upload endpoint - automatic metadata save
+    // Upload endpoint
     // -------------------
     app.post("/upload", upload.single("image"), async (req, res) => {
       try {
@@ -73,7 +70,7 @@ async function init() {
         // Generate public file URL
         const fileUrl = `${process.env.BACKBLAZE_ENDPOINT}/${uploadResponse.data.fileName}`;
 
-        // Save metadata in MongoDB automatically
+        // Save metadata in MongoDB
         const imageDoc = new Image({
           name: file.originalname,
           url: fileUrl,
@@ -89,20 +86,20 @@ async function init() {
     });
 
     // -------------------
-    // 6️⃣ API Routes for frontend
+    // Image API routes for frontend
     // -------------------
     app.use("/api/images", imageRoutes);
 
     // -------------------
-    // 7️⃣ Start Server
+    // Start Server
     // -------------------
-    app.listen(process.env.PORT, () =>
-      console.log(`🚀 Server running on port ${process.env.PORT}`)
-    );
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
   } catch (err) {
     console.error("❌ Backblaze authorization failed:", err);
   }
 }
 
+// Initialize server
 init();

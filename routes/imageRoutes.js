@@ -1,18 +1,7 @@
-// routes/imageRoutes.js
 import express from "express";
 import Image from "../models/Image.js";
-import B2 from "backblaze-b2";
 
 const router = express.Router();
-
-// Initialize B2
-const b2 = new B2({
-  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
-  applicationKey: process.env.BACKBLAZE_APP_KEY,
-});
-
-// Authorize B2
-await b2.authorize();
 
 // GET images (with pagination)
 router.get("/", async (req, res) => {
@@ -27,33 +16,16 @@ router.get("/", async (req, res) => {
       .limit(limit)
       .sort({ uploadedAt: -1 });
 
-    // Generate temporary URL for each image
-    const imagesWithUrl = await Promise.all(
-      images.map(async (img) => {
-        const auth = await b2.getDownloadAuthorization({
-          bucketId: process.env.BACKBLAZE_BUCKET_ID,
-          fileName: img.fileName,
-          validDurationInSeconds: 3600, // 1 hour
-        });
-
-        const url = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(
-          img.fileName
-        )}?Authorization=${auth.data.authorizationToken}`;
-
-        return {
-          _id: img._id,
-          name: img.fileName,
-          url,
-          uploadedAt: img.uploadedAt,
-        };
-      })
-    );
-
     res.json({
       page,
       total,
       totalPages: Math.ceil(total / limit),
-      images: imagesWithUrl,
+      images: images.map(img => ({
+        _id: img._id,
+        name: img.name || img.fileName,
+        url: img.url,
+        uploadedAt: img.uploadedAt,
+      })),
     });
   } catch (err) {
     console.error(err);
@@ -65,32 +37,16 @@ router.get("/", async (req, res) => {
 router.get("/search", async (req, res) => {
   try {
     const query = req.query.q || "";
-    const images = await Image.find({ fileName: { $regex: query, $options: "i" } })
+    const images = await Image.find({ name: { $regex: query, $options: "i" } })
       .limit(50)
       .sort({ uploadedAt: -1 });
 
-    const imagesWithUrl = await Promise.all(
-      images.map(async (img) => {
-        const auth = await b2.getDownloadAuthorization({
-          bucketId: process.env.BACKBLAZE_BUCKET_ID,
-          fileName: img.fileName,
-          validDurationInSeconds: 3600,
-        });
-
-        const url = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(
-          img.fileName
-        )}?Authorization=${auth.data.authorizationToken}`;
-
-        return {
-          _id: img._id,
-          name: img.fileName,
-          url,
-          uploadedAt: img.uploadedAt,
-        };
-      })
-    );
-
-    res.json(imagesWithUrl);
+    res.json(images.map(img => ({
+      _id: img._id,
+      name: img.name,
+      url: img.url,
+      uploadedAt: img.uploadedAt,
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Search failed" });
