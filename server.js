@@ -5,13 +5,19 @@ import B2 from "backblaze-b2";
 import multer from "multer";
 import imageRoutes from "./routes/imageRoutes.js"; // Import API routes
 import Image from "./models/Image.js"; // Import Image model
+import cors from "cors";
 
 dotenv.config();
 
-console.log("MONGO_URI:", process.env.MONGO_URI);
+const app = express(); // <-- Initialize app first
 
-const app = express();
+app.use(cors({
+  origin: "*", // You can later restrict to your Vercel URL
+}));
+
 app.use(express.json());
+
+console.log("MONGO_URI:", process.env.MONGO_URI);
 
 // -------------------
 // 1️⃣ MongoDB connection
@@ -24,9 +30,12 @@ mongoose.connect(process.env.MONGO_URI)
 // 2️⃣ Backblaze B2 setup
 // -------------------
 const b2 = new B2({
-  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
-  applicationKey: process.env.BACKBLAZE_APP_KEY
+  applicationKeyId: process.env.BACKBLAZE_KEY_ID, // Backblaze Dashboard-ൽ നിന്നുള്ള Key ID
+  applicationKey: process.env.BACKBLAZE_APP_KEY   // Application Key
 });
+
+await b2.authorize(); // ✅ കീകൾ ശരിയാണെങ്കിൽ ഇത് സക്സസ്സ് ആവും
+
 
 // -------------------
 // 3️⃣ Async init function
@@ -51,7 +60,7 @@ async function init() {
         if (!file) return res.status(400).json({ error: "No file uploaded" });
 
         // Get upload URL from Backblaze
-        const uploadUrlResponse = await b2.getUploadUrl({ bucketId: process.env.BACKBLAZE_BUCKET });
+        const uploadUrlResponse = await b2.getUploadUrl({ bucketId: process.env.BACKBLAZE_BUCKET_ID });
 
         // Upload file to Backblaze
         const uploadResponse = await b2.uploadFile({

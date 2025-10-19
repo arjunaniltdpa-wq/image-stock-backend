@@ -1,44 +1,98 @@
+// routes/imageRoutes.js
 import express from "express";
 import Image from "../models/Image.js";
+import B2 from "backblaze-b2";
 
 const router = express.Router();
 
-// ✅ Fetch all images (with pagination)
+// Initialize B2
+const b2 = new B2({
+  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
+  applicationKey: process.env.BACKBLAZE_APP_KEY,
+});
+
+// Authorize B2
+await b2.authorize();
+
+// GET images (with pagination)
 router.get("/", async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1; // which page to show
-    const limit = parseInt(req.query.limit) || 30; // how many per page
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
     const total = await Image.countDocuments();
     const images = await Image.find()
-      .sort({ uploadedAt: -1 }) // newest first
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .sort({ uploadedAt: -1 });
+
+    // Generate temporary URL for each image
+    const imagesWithUrl = await Promise.all(
+      images.map(async (img) => {
+        const auth = await b2.getDownloadAuthorization({
+          bucketId: process.env.BACKBLAZE_BUCKET_ID,
+          fileName: img.fileName,
+          validDurationInSeconds: 3600, // 1 hour
+        });
+
+        const url = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(
+          img.fileName
+        )}?Authorization=${auth.data.authorizationToken}`;
+
+        return {
+          _id: img._id,
+          name: img.fileName,
+          url,
+          uploadedAt: img.uploadedAt,
+        };
+      })
+    );
 
     res.json({
       page,
       total,
       totalPages: Math.ceil(total / limit),
-      images,
+      images: imagesWithUrl,
     });
   } catch (err) {
-    console.error("❌ Fetch error:", err);
-    res.status(500).json({ error: "Failed to fetch images" });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// ✅ Search images by name
+// Search images
 router.get("/search", async (req, res) => {
   try {
-    const q = req.query.q || "";
-    const images = await Image.find({ name: { $regex: q, $options: "i" } })
-      .sort({ uploadedAt: -1 })
-      .limit(50);
+    const query = req.query.q || "";
+    const images = await Image.find({ fileName: { $regex: query, $options: "i" } })
+      .limit(50)
+      .sort({ uploadedAt: -1 });
 
-    res.json(images);
+    const imagesWithUrl = await Promise.all(
+      images.map(async (img) => {
+        const auth = await b2.getDownloadAuthorization({
+          bucketId: process.env.BACKBLAZE_BUCKET_ID,
+          fileName: img.fileName,
+          validDurationInSeconds: 3600,
+        });
+
+        const url = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(
+          img.fileName
+        )}?Authorization=${auth.data.authorizationToken}`;
+
+        return {
+          _id: img._id,
+          name: img.fileName,
+          url,
+          uploadedAt: img.uploadedAt,
+        };
+      })
+    );
+
+    res.json(imagesWithUrl);
   } catch (err) {
-    console.error("❌ Search error:", err);
+    console.error(err);
     res.status(500).json({ error: "Search failed" });
   }
 });
