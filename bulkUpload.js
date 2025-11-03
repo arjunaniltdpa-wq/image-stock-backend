@@ -1,29 +1,21 @@
+// bulkUpload.js
 import fs from "fs";
 import path from "path";
-import fetch from "node-fetch";
-import crypto from "crypto";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import B2 from "backblaze-b2";
+import { generateSEOFromFilename } from "./lib/seoGenerator.js"; // ✅ Import your SEO generator
 
 dotenv.config();
 
 // -----------------------------
 // 1️⃣ Config
 // -----------------------------
-const folderPath = "./images-to-upload"; // Your images folder
-const processedFolder = "./processed"; // Move uploaded files here
-
-// Backblaze B2 keys from .env
-const B2_ACCOUNT_ID = process.env.B2_ACCOUNT_ID;
-const B2_APPLICATION_KEY = process.env.B2_APPLICATION_KEY;
-const BUCKET_ID = process.env.B2_BUCKET_ID;
-const BATCH_SIZE = 50; // Adjustable for daily 500 images
-const RETRY_LIMIT = 3;
-
-if (!fs.existsSync(processedFolder)) fs.mkdirSync(processedFolder);
-
-let AUTH_TOKEN = "";
-let UPLOAD_URL = "";
+const FOLDER_PATH = "./image-to-upload";
+if (!fs.existsSync(FOLDER_PATH)) {
+  console.log("❌ Folder 'image-to-upload' not found!");
+  process.exit(1);
+}
 
 // -----------------------------
 // 2️⃣ MongoDB Setup
@@ -33,119 +25,102 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
 const imageSchema = new mongoose.Schema({
-  fileName: String,
+  name: String,       // SEO-friendly name
+  fileName: String,   // original file name
   url: String,
+  category: String,
+  title: String,
+  description: String,
+  alt: String,
+  tags: [String],
   uploadedAt: { type: Date, default: Date.now },
 });
 
-const Image = mongoose.model("Image", imageSchema, "images"); // collection "images"
+const Image = mongoose.model("Image", imageSchema, "images");
 
 // -----------------------------
-// 3️⃣ Authenticate & get upload URL
+// 3️⃣ Backblaze Setup
 // -----------------------------
-async function authorizeB2() {
-  const auth = Buffer.from(`${B2_ACCOUNT_ID}:${B2_APPLICATION_KEY}`).toString("base64");
-  const res = await fetch("https://api.backblazeb2.com/b2api/v2/b2_authorize_account", {
-    headers: { Authorization: `Basic ${auth}` },
+const b2 = new B2({
+  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
+  applicationKey: process.env.BACKBLAZE_APP_KEY,
+});
+
+const BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID;
+const BASE_URL = process.env.BACKBLAZE_BASE_URL; // ex: https://f005.backblazeb2.com/file/pexelora-images/
+
+// -----------------------------
+// 4️⃣ Helper Functions
+// -----------------------------
+function getAllImages(dir) {
+  let results = [];
+  const list = fs.readdirSync(dir);
+  list.forEach(file => {
+    const filePath = path.join(dir, file);
+    const stat = fs.statSync(filePath);
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getAllImages(filePath)); // recurse subfolders
+    } else if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
+      results.push(filePath);
+    }
   });
-  const data = await res.json();
-
-  AUTH_TOKEN = data.authorizationToken;
-  console.log("✅ Authenticated successfully");
-
-  const uploadRes = await fetch(`${data.apiUrl}/b2api/v2/b2_get_upload_url`, {
-    method: "POST",
-    headers: { Authorization: AUTH_TOKEN, "Content-Type": "application/json" },
-    body: JSON.stringify({ bucketId: BUCKET_ID }),
-  });
-  const uploadData = await uploadRes.json();
-
-  UPLOAD_URL = uploadData.uploadUrl;
-  AUTH_TOKEN = uploadData.authorizationToken;
-
-  console.log("✅ Upload URL ready");
+  return results;
 }
 
 // -----------------------------
-// 4️⃣ Upload single file with retry
-// -----------------------------
-async function uploadSingle(filePath, fileName, attempt = 1) {
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const sha1 = crypto.createHash("sha1").update(fileBuffer).digest("hex");
-
-    const res = await fetch(UPLOAD_URL, {
-      method: "POST",
-      headers: {
-        Authorization: AUTH_TOKEN,
-        "X-Bz-File-Name": encodeURIComponent(fileName),
-        "Content-Type": "b2/x-auto",
-        "Content-Length": fileBuffer.length.toString(),
-        "X-Bz-Content-Sha1": sha1,
-      },
-      body: fileBuffer,
-    });
-
-    const data = await res.json();
-
-    if (res.status === 200) {
-      console.log(`✅ Uploaded: ${fileName}`);
-
-      // Save metadata to MongoDB
-      await Image.create({ fileName, url: fileName });
-
-      // Move uploaded file
-      fs.renameSync(filePath, path.join(processedFolder, fileName));
-      return true;
-    } else {
-      if (attempt < RETRY_LIMIT) {
-        console.log(`⚠️ Retry ${attempt} for ${fileName}`);
-        return uploadSingle(filePath, fileName, attempt + 1);
-      } else {
-        console.error(`❌ Failed: ${fileName}`, data.message || data);
-        return false;
-      }
-    }
-  } catch (err) {
-    if (attempt < RETRY_LIMIT) {
-      console.log(`⚠️ Retry ${attempt} for ${fileName} (Error)`);
-      return uploadSingle(filePath, fileName, attempt + 1);
-    } else {
-      console.error(`❌ Error: ${fileName}`, err.message);
-      return false;
-    }
-  }
-}
-
-// -----------------------------
-// 5️⃣ Main batch upload (Sequential)
+// 5️⃣ Upload Function
 // -----------------------------
 async function uploadAll() {
-  const files = fs.readdirSync(folderPath).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-  console.log(`Total files to upload: ${files.length}`);
-
+  const files = getAllImages(FOLDER_PATH);
   if (files.length === 0) {
-    console.log("No files to upload!");
+    console.log("No images to upload!");
     return;
   }
 
-  await authorizeB2();
+  await b2.authorize();
+  console.log(`🖼️ Found ${files.length} images.`);
 
-  for (let i = 0; i < files.length; i += BATCH_SIZE) {
-    const batch = files.slice(i, i + BATCH_SIZE);
+  for (const filePath of files) {
+    const fileName = path.basename(filePath);
 
-    for (const fileName of batch) {
-      await uploadSingle(path.join(folderPath, fileName), fileName); // sequential
+    try {
+      const uploadUrlResponse = await b2.getUploadUrl({ bucketId: BUCKET_ID });
+
+      // Upload using original file name
+      await b2.uploadFile({
+        uploadUrl: uploadUrlResponse.data.uploadUrl,
+        uploadAuthToken: uploadUrlResponse.data.authorizationToken,
+        fileName: fileName,
+        data: fs.readFileSync(filePath),
+      });
+
+      // ✅ Generate SEO automatically
+      const seo = generateSEOFromFilename(fileName);
+
+      await Image.create({
+        name: fileName.toLowerCase().replace(/\s+/g, "-"), // SEO-friendly name
+        fileName,
+        url: `${BASE_URL}${encodeURIComponent(fileName)}`,
+        category: seo.category,
+        title: seo.title,
+        description: seo.description,
+        alt: seo.alt,
+        tags: seo.tags,
+        uploadedAt: new Date(),
+      });
+
+      fs.unlinkSync(filePath); // remove local file
+      console.log(`✅ Uploaded & SEO added: ${fileName}`);
+    } catch (err) {
+      console.error(`❌ Failed for ${fileName}:`, err.message);
     }
-
-    console.log(`✅ Batch ${Math.floor(i / BATCH_SIZE) + 1} completed`);
   }
 
-  console.log("🎉 All images processed!");
+  console.log("🎉 All images processed successfully!");
+  process.exit(0);
 }
 
-
 // -----------------------------
-// 6️⃣ Run the script
+// 6️⃣ Run
 // -----------------------------
 uploadAll();
