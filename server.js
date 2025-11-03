@@ -18,8 +18,6 @@ import { fileURLToPath } from "url";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
-
-
 // ---------------------------
 // ES Module __dirname setup
 // ---------------------------
@@ -81,15 +79,15 @@ async function uploadLocalFolderToBackblaze() {
       await b2.uploadFile({
         uploadUrl: uploadUrlResponse.data.uploadUrl,
         uploadAuthToken: uploadUrlResponse.data.authorizationToken,
-        fileName, // ✅ keep original filename
+        fileName,
         data: fs.readFileSync(filePath),
       });
 
       await Image.create({
-        name: fileName, // ✅ original name
+        name: fileName,
         fileName,
         url: `${process.env.BACKBLAZE_BASE_URL}${encodeURIComponent(fileName)}`,
-        category: "uncategorized", // default
+        category: "uncategorized",
         uploadedAt: new Date(),
       });
 
@@ -121,15 +119,11 @@ app.get("/api/images/popular", async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const images = await Image.find()
-      .sort({ uploadedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const images = await Image.find().sort({ uploadedAt: -1 }).skip(skip).limit(limit);
 
     const data = images.map(img => {
       const file = img.fileName || img.url;
       const thumb = img.thumbnailFileName || img.fileName || img.url;
-
       return {
         _id: img._id,
         name: img.name || file,
@@ -147,7 +141,7 @@ app.get("/api/images/popular", async (req, res) => {
 });
 
 // ---------------------------
-// Backblaze Upload endpoint (keep original names)
+// Backblaze Upload endpoint
 // ---------------------------
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
@@ -159,12 +153,12 @@ app.post("/upload", upload.single("image"), async (req, res) => {
     await b2.uploadFile({
       uploadUrl: uploadUrlResponse.data.uploadUrl,
       uploadAuthToken: uploadUrlResponse.data.authorizationToken,
-      fileName: file.originalname, // ✅ keep original filename
+      fileName: file.originalname,
       data: file.buffer,
     });
 
     const imageDoc = new Image({
-      name: file.originalname, // ✅ original name
+      name: file.originalname,
       fileName: file.originalname,
       url: `${process.env.BACKBLAZE_BASE_URL}${encodeURIComponent(file.originalname)}`,
       category: "uncategorized",
@@ -179,37 +173,22 @@ app.post("/upload", upload.single("image"), async (req, res) => {
   }
 });
 
-
 // ---------------------------
-// LIGHTX UPSCALE - 4X QUALITY ENHANCEMENT
+// LIGHTX UPSCALE
 // ---------------------------
+const LIGHTX_API_KEY = process.env.LIGHTX_API_KEY;
 
-const LIGHTX_API_KEY = "ef80324dd4b44f0c92b5abab16c67e11_cbc9ddaf314d4d639cc730bb8a0cae9e_andoraitools";
-
-// 4× Upscale Endpoint
 app.post("/api/upscale", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) {
-      console.error("❌ No file uploaded");
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    console.log("📸 Received file for upscale:", {
-      name: req.file.originalname,
-      type: req.file.mimetype,
-      size: req.file.size,
-    });
-
-    // Prepare LightX form data
     const form = new FormData();
     form.append("image_file", req.file.buffer, {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
     });
-    form.append("scale", "4"); // ✅ 4x upscale
-    form.append("output_format", "jpg"); // or "png"
-
-    console.log("⏫ Sending image to LightX API...");
+    form.append("scale", "4");
+    form.append("output_format", "jpg");
 
     const lightxResponse = await axios.post(
       "https://api.lightxeditor.com/v2/upscale",
@@ -217,33 +196,21 @@ app.post("/api/upscale", upload.single("image"), async (req, res) => {
       {
         headers: {
           ...form.getHeaders(),
-          Authorization: `Bearer ${LIGHTX_API_KEY}`, // ✅ FIXED
+          Authorization: `Bearer ${LIGHTX_API_KEY}`,
         },
         responseType: "arraybuffer",
         timeout: 60000,
       }
     );
 
-    console.log("✅ Upscale successful from LightX");
-
-    // Save upscaled image temporarily
     const outputPath = path.join("uploads", `upscaled_${Date.now()}.jpg`);
     fs.writeFileSync(outputPath, Buffer.from(lightxResponse.data));
-
-    // Return public URL for frontend
     const publicUrl = `${req.protocol}://${req.get("host")}/${outputPath}`;
 
-    return res.json({
-      success: true,
-      outputUrl: publicUrl,
-      message: "Upscale completed successfully",
-    });
+    res.json({ success: true, outputUrl: publicUrl });
   } catch (err) {
     console.error("❌ LightX Upscale Error:", err.response?.data || err.message);
-    res.status(500).json({
-      message: "Upscale failed",
-      details: err.response?.data || err.message,
-    });
+    res.status(500).json({ message: "Upscale failed", details: err.message });
   }
 });
 
@@ -258,7 +225,7 @@ app.post("/api/remove-bg", upload.single("image_file"), async (req, res) => {
     form.append("image_file", req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
     form.append("size", "auto");
 
-    const removeBgResponse = await fetch("https://api.remove.bg/v1.0/removebg", {
+    const response = await fetch("https://api.remove.bg/v1.0/removebg", {
       method: "POST",
       headers: {
         "X-Api-Key": process.env.REMOVEBG_API_KEY,
@@ -267,16 +234,14 @@ app.post("/api/remove-bg", upload.single("image_file"), async (req, res) => {
       body: form
     });
 
-    if (!removeBgResponse.ok) {
-      const errText = await removeBgResponse.text();
-      console.error("❌ remove.bg error:", errText);
-      return res.status(removeBgResponse.status).json({ message: "remove.bg failed", details: errText });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).json({ message: "remove.bg failed", details: errText });
     }
 
-    const arrayBuffer = await removeBgResponse.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const arrayBuffer = await response.arrayBuffer();
     res.setHeader("Content-Type", "image/png");
-    res.send(buffer);
+    res.send(Buffer.from(arrayBuffer));
   } catch (err) {
     console.error("❌ Remove-bg proxy error:", err);
     res.status(500).json({ message: "Remove-bg failed", details: err.message });
@@ -284,33 +249,50 @@ app.post("/api/remove-bg", upload.single("image_file"), async (req, res) => {
 });
 
 // ---------------------------
-// Backblaze File Proxy
+// Private Bucket File Proxy
 // ---------------------------
 app.get("/api/images/file/:fileName", async (req, res) => {
   try {
     const fileName = decodeURIComponent(req.params.fileName);
 
     await b2.authorize();
-    const download = await b2.downloadFileByName({  
+    const auth = await b2.getDownloadAuthorization({
       bucketId: process.env.BACKBLAZE_BUCKET_ID,
-      fileName
+      fileNamePrefix: fileName,
+      validDurationInSeconds: 3600,
     });
 
-    const buffer = Buffer.from(download.data);
-    const ext = fileName.split(".").pop().toLowerCase();
-    res.setHeader(
-      "Content-Type",
-      ext === "png"
-        ? "image/png"
-        : ext === "jpg" || ext === "jpeg"
-        ? "image/jpeg"
-        : "application/octet-stream"
-    );
+    const signedUrl = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${auth.data.authorizationToken}`;
 
-    res.send(buffer);
+    const response = await axios.get(signedUrl, { responseType: "arraybuffer" });
+    const ext = fileName.split(".").pop().toLowerCase();
+    res.setHeader("Content-Type", ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "application/octet-stream");
+    res.send(Buffer.from(response.data));
   } catch (err) {
-    console.error("❌ File proxy error:", err);
+    console.error("❌ Private bucket file proxy error:", err.message);
     res.status(500).json({ message: "Failed to fetch file", details: err.message });
+  }
+});
+
+// ---------------------------
+// Generate Signed Download URL (Frontend Fetch)
+// ---------------------------
+app.get("/api/get-file-url/:fileName", async (req, res) => {
+  try {
+    const fileName = decodeURIComponent(req.params.fileName);
+    await b2.authorize();
+
+    const auth = await b2.getDownloadAuthorization({
+      bucketId: process.env.BACKBLAZE_BUCKET_ID,
+      fileNamePrefix: fileName,
+      validDurationInSeconds: 3600,
+    });
+
+    const signedUrl = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${auth.data.authorizationToken}`;
+    res.json({ url: signedUrl });
+  } catch (err) {
+    console.error("❌ Signed URL generation error:", err.message);
+    res.status(500).json({ message: "Failed to generate signed URL", details: err.message });
   }
 });
 
@@ -320,78 +302,50 @@ app.get("/api/images/file/:fileName", async (req, res) => {
 app.use("/api/images", imageRoutes);
 
 // ---------------------------
-// Local uploads folder
-// ---------------------------
 const localUploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(localUploadDir)) fs.mkdirSync(localUploadDir);
 app.use("/uploads", express.static(localUploadDir));
 
 // ---------------------------
-// Root
-// ---------------------------
-app.get("/", (req, res) => {
-  res.send("Backend is live. Connect your frontend!");
-});
+app.get("/", (req, res) => res.send("Backend is live. Connect your frontend!"));
 
 // ---------------------------
-// Image Compressor Proxy
+// Compressor & Converter
 // ---------------------------
 app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-    const compressedBuffer = await sharp(req.file.buffer)
-      .jpeg({ quality: 60 })
-      .toBuffer();
-
+    const buffer = await sharp(req.file.buffer).jpeg({ quality: 60 }).toBuffer();
     res.setHeader("Content-Type", "image/jpeg");
-    res.send(compressedBuffer);
+    res.send(buffer);
   } catch (err) {
-    console.error("❌ Compress error:", err);
     res.status(500).json({ message: "Compression failed", details: err.message });
   }
 });
 
-// ---------------------------
-// Format Converter Proxy
-// ---------------------------
 app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
     const format = req.body.format?.toLowerCase();
     if (!format) return res.status(400).json({ message: "No format specified" });
 
+    const validFormats = ["jpg", "jpeg", "png", "webp", "tiff", "pdf"];
+    if (!validFormats.includes(format)) return res.status(400).json({ message: "Invalid format" });
+
     if (format === "pdf") {
-      const imgBuffer = req.file.buffer;
       const pdfDoc = await PDFDocument.create();
-      const metadata = await sharp(imgBuffer).metadata();
-
-      let img;
-      if (metadata.format === "png") img = await pdfDoc.embedPng(imgBuffer);
-      else if (["jpeg", "jpg"].includes(metadata.format)) img = await pdfDoc.embedJpg(imgBuffer);
-      else return res.status(400).json({ message: "Unsupported image format for PDF" });
-
+      const metadata = await sharp(req.file.buffer).metadata();
+      const img = metadata.format === "png" ? await pdfDoc.embedPng(req.file.buffer) : await pdfDoc.embedJpg(req.file.buffer);
       const page = pdfDoc.addPage([img.width, img.height]);
       page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-
       const pdfBytes = await pdfDoc.save();
       res.setHeader("Content-Type", "application/pdf");
       return res.send(Buffer.from(pdfBytes));
     }
 
-    const validFormats = ["jpg", "jpeg", "png", "webp", "tiff"];
-    if (!validFormats.includes(format)) return res.status(400).json({ message: "Invalid format" });
-
-    const convertedBuffer = await sharp(req.file.buffer)
-      .toFormat(format)
-      .toBuffer();
-
+    const converted = await sharp(req.file.buffer).toFormat(format).toBuffer();
     const mime = `image/${format === "jpg" ? "jpeg" : format}`;
     res.setHeader("Content-Type", mime);
-    res.send(convertedBuffer);
+    res.send(converted);
   } catch (err) {
-    console.error("❌ Conversion route error:", err);
     res.status(500).json({ message: "Conversion failed", details: err.message });
   }
 });
@@ -401,6 +355,4 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
