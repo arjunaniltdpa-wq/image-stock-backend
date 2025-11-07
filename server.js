@@ -18,6 +18,9 @@ import { fileURLToPath } from "url";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
+// ✅ SEO IMPORT
+import { generateSEOFromFilename } from "./lib/seoGenerator.js";
+
 // ---------------------------
 // ES Module __dirname setup
 // ---------------------------
@@ -60,10 +63,25 @@ const b2 = new B2({
   applicationKey: process.env.BACKBLAZE_APP_KEY,
 });
 
+// ✅ Helper: Build signed B2 "download by filename" URL
+async function buildB2SignedByNameUrl(fileName) {
+  await b2.authorize();
+
+  const auth = await b2.getDownloadAuthorization({
+    bucketId: process.env.BACKBLAZE_BUCKET_ID,
+    fileNamePrefix: fileName,
+    validDurationInSeconds: 3600,
+  });
+
+  const { data: { downloadUrl } } = await b2.authorize();
+
+  return `${downloadUrl}/file/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${auth.data.authorizationToken}`;
+}
+
 const BULK_UPLOAD_FOLDER = path.join(__dirname, "image-to-upload");
 
 // ---------------------------
-// Bulk upload folder function (keep original names)
+// Bulk upload with SEO Auto
 // ---------------------------
 async function uploadLocalFolderToBackblaze() {
   const files = fs.readdirSync(BULK_UPLOAD_FOLDER).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
@@ -76,29 +94,49 @@ async function uploadLocalFolderToBackblaze() {
 
     try {
       const uploadUrlResponse = await b2.getUploadUrl({ bucketId: process.env.BACKBLAZE_BUCKET_ID });
+
+      const buffer = fs.readFileSync(filePath);
+
       await b2.uploadFile({
         uploadUrl: uploadUrlResponse.data.uploadUrl,
         uploadAuthToken: uploadUrlResponse.data.authorizationToken,
         fileName,
-        data: fs.readFileSync(filePath),
+        data: buffer,
       });
 
+      const thumbBuffer = await sharp(buffer).resize({ width: 400 }).jpeg({ quality: 70 }).toBuffer();
+      const thumbName = `thumb_${fileName}`;
+
+      await b2.uploadFile({
+        uploadUrl: uploadUrlResponse.data.uploadUrl,
+        uploadAuthToken: uploadUrlResponse.data.authorizationToken,
+        fileName: thumbName,
+        data: thumbBuffer,
+      });
+
+      const seo = generateSEOFromFilename(fileName);
+
       await Image.create({
-        name: fileName,
+        name: seo.title,
         fileName,
+        thumbnailFileName: thumbName,
         url: `${process.env.BACKBLAZE_BASE_URL}${encodeURIComponent(fileName)}`,
-        category: "uncategorized",
+        category: seo.category,
+        tags: seo.tags,
+        description: seo.description,
+        altText: seo.alt,
         uploadedAt: new Date(),
       });
 
       fs.unlinkSync(filePath);
-      console.log(`✅ Uploaded: ${fileName}`);
+      console.log(`✅ Uploaded with thumbnail + SEO: ${fileName}`);
+
     } catch (err) {
       console.error(`❌ Failed for ${fileName}:`, err.message);
     }
   }
 
-  console.log("🎉 All local images uploaded to Backblaze!");
+  console.log("🎉 All local images uploaded (original + thumbnail) with SEO!");
 }
 
 // ---------------------------
@@ -124,6 +162,7 @@ app.get("/api/images/popular", async (req, res) => {
     const data = images.map(img => {
       const file = img.fileName || img.url;
       const thumb = img.thumbnailFileName || img.fileName || img.url;
+
       return {
         _id: img._id,
         name: img.name || file,
@@ -141,75 +180,89 @@ app.get("/api/images/popular", async (req, res) => {
 });
 
 // ---------------------------
-// Backblaze Upload endpoint
+// Backblaze Upload endpoint (✅ SEO added)
 // ---------------------------
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const file = req.file;
-    if (!file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
     await b2.authorize();
     const uploadUrlResponse = await b2.getUploadUrl({ bucketId: process.env.BACKBLAZE_BUCKET_ID });
+
     await b2.uploadFile({
       uploadUrl: uploadUrlResponse.data.uploadUrl,
       uploadAuthToken: uploadUrlResponse.data.authorizationToken,
-      fileName: file.originalname,
-      data: file.buffer,
+      fileName: req.file.originalname,
+      data: req.file.buffer,
     });
+
+    const seo = generateSEOFromFilename(req.file.originalname);
 
     const imageDoc = new Image({
-      name: file.originalname,
-      fileName: file.originalname,
-      url: `${process.env.BACKBLAZE_BASE_URL}${encodeURIComponent(file.originalname)}`,
-      category: "uncategorized",
+      name: seo.title,
+      fileName: req.file.originalname,
+      url: `${process.env.BACKBLAZE_BASE_URL}${encodeURIComponent(req.file.originalname)}`,
+      category: seo.category,
+      tags: seo.tags,
+      description: seo.description,
+      altText: seo.alt,
       uploadedAt: new Date()
     });
+
     await imageDoc.save();
 
-    res.json({ message: "✅ Uploaded successfully", fileName: file.originalname });
+    res.json({ message: "✅ Uploaded successfully with SEO", fileName: req.file.originalname, seo });
   } catch (err) {
     console.error("❌ Upload error:", err);
     res.status(500).json({ error: "Upload failed", details: err.message });
   }
 });
 
-// ---------------------------
-// LIGHTX UPSCALE
-// ---------------------------
-const LIGHTX_API_KEY = process.env.LIGHTX_API_KEY;
-
+// ✅ ✅ ✅ RUNWARE UPSCALE
 app.post("/api/upscale", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    const form = new FormData();
-    form.append("image_file", req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-    });
-    form.append("scale", "4");
-    form.append("output_format", "jpg");
+    const inputPath = path.join("uploads", `input_${Date.now()}.jpg`);
+    fs.writeFileSync(inputPath, req.file.buffer);
 
-    const lightxResponse = await axios.post(
-      "https://api.lightxeditor.com/v2/upscale",
-      form,
+    const imageURL = `${req.protocol}://${req.get("host")}/${inputPath}`;
+
+    const response = await axios.post(
+      "https://api.runware.ai/v1/upscale",
+      [
+        {
+          taskType: "upscale",
+          taskUUID: uuidv4(),
+          imageURL: imageURL,
+          scale: 4
+        }
+      ],
       {
         headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${LIGHTX_API_KEY}`,
+          Authorization: `Bearer ${process.env.RUNWARE_API_KEY}`,
+          "Content-Type": "application/json",
         },
-        responseType: "arraybuffer",
-        timeout: 60000,
+        timeout: 120000,
       }
     );
 
+    if (!response.data?.[0]?.data?.output) {
+      throw new Error("No output returned from Runware");
+    }
+
+    const outputBase64 = response.data[0].data.output;
+    const outputBuffer = Buffer.from(outputBase64, "base64");
+
     const outputPath = path.join("uploads", `upscaled_${Date.now()}.jpg`);
-    fs.writeFileSync(outputPath, Buffer.from(lightxResponse.data));
+    fs.writeFileSync(outputPath, outputBuffer);
+
     const publicUrl = `${req.protocol}://${req.get("host")}/${outputPath}`;
 
     res.json({ success: true, outputUrl: publicUrl });
+
   } catch (err) {
-    console.error("❌ LightX Upscale Error:", err.response?.data || err.message);
+    console.error("❌ Runware Upscale Error:", err.response?.data || err.message);
     res.status(500).json({ message: "Upscale failed", details: err.message });
   }
 });
@@ -248,25 +301,23 @@ app.post("/api/remove-bg", upload.single("image_file"), async (req, res) => {
   }
 });
 
-// ---------------------------
-// Private Bucket File Proxy
-// ---------------------------
+// ✅ ✅ ✅ PRIVATE BUCKET FILE PROXY (FIXED)
 app.get("/api/images/file/:fileName", async (req, res) => {
   try {
     const fileName = decodeURIComponent(req.params.fileName);
-
-    await b2.authorize();
-    const auth = await b2.getDownloadAuthorization({
-      bucketId: process.env.BACKBLAZE_BUCKET_ID,
-      fileNamePrefix: fileName,
-      validDurationInSeconds: 3600,
-    });
-
-    const signedUrl = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${auth.data.authorizationToken}`;
+    const signedUrl = await buildB2SignedByNameUrl(fileName);
 
     const response = await axios.get(signedUrl, { responseType: "arraybuffer" });
+
     const ext = fileName.split(".").pop().toLowerCase();
-    res.setHeader("Content-Type", ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "application/octet-stream");
+    const mime =
+      ext === "png" ? "image/png" :
+      ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
+      ext === "webp" ? "image/webp" : "application/octet-stream";
+
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+
     res.send(Buffer.from(response.data));
   } catch (err) {
     console.error("❌ Private bucket file proxy error:", err.message);
@@ -274,22 +325,12 @@ app.get("/api/images/file/:fileName", async (req, res) => {
   }
 });
 
-// ---------------------------
-// Generate Signed Download URL (Frontend Fetch)
-// ---------------------------
+// ✅ ✅ ✅ SIGNED URL GENERATOR (FIXED)
 app.get("/api/get-file-url/:fileName", async (req, res) => {
   try {
     const fileName = decodeURIComponent(req.params.fileName);
-    await b2.authorize();
-
-    const auth = await b2.getDownloadAuthorization({
-      bucketId: process.env.BACKBLAZE_BUCKET_ID,
-      fileNamePrefix: fileName,
-      validDurationInSeconds: 3600,
-    });
-
-    const signedUrl = `https://s3.us-west-004.backblazeb2.com/${process.env.BACKBLAZE_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${auth.data.authorizationToken}`;
-    res.json({ url: signedUrl });
+    const url = await buildB2SignedByNameUrl(fileName);
+    res.json({ url });
   } catch (err) {
     console.error("❌ Signed URL generation error:", err.message);
     res.status(500).json({ message: "Failed to generate signed URL", details: err.message });
