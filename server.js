@@ -305,25 +305,43 @@ app.post("/api/remove-bg", upload.single("image_file"), async (req, res) => {
 app.get("/api/images/file/:fileName", async (req, res) => {
   try {
     const fileName = decodeURIComponent(req.params.fileName);
-    const signedUrl = await buildB2SignedByNameUrl(fileName);
+    const width = req.query.width ? parseInt(req.query.width) : null;
+    const height = req.query.height ? parseInt(req.query.height) : null;
+    const crop = req.query.crop; // ?crop=true
 
+    const signedUrl = await buildB2SignedByNameUrl(fileName);
     const response = await axios.get(signedUrl, { responseType: "arraybuffer" });
 
-    const ext = fileName.split(".").pop().toLowerCase();
-    const mime =
-      ext === "png" ? "image/png" :
-      ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
-      ext === "webp" ? "image/webp" : "application/octet-stream";
+    const imageBuffer = Buffer.from(response.data);
 
-    res.setHeader("Content-Type", mime);
+    let finalBuffer = imageBuffer;
+
+    // ✅ Resize logic (portrait + landscape safe)
+    if (width || height) {
+      let sharpOptions = { fit: "inside" };
+
+      // ✅ Crop square mode (Instagram style)
+      if (crop === "true") {
+        sharpOptions = { fit: "cover", position: "center" }; 
+      }
+
+      finalBuffer = await sharp(imageBuffer)
+        .resize(width, height, sharpOptions)
+        .jpeg({ quality: 80 })
+        .toBuffer();
+    }
+
+    res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 
-    res.send(Buffer.from(response.data));
+    res.send(finalBuffer);
+
   } catch (err) {
     console.error("❌ Private bucket file proxy error:", err.message);
     res.status(500).json({ message: "Failed to fetch file", details: err.message });
   }
 });
+
 
 // ✅ ✅ ✅ SIGNED URL GENERATOR (FIXED)
 app.get("/api/get-file-url/:fileName", async (req, res) => {
