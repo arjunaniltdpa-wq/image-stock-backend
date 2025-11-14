@@ -3,8 +3,12 @@ import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import B2 from "backblaze-b2";
-import { generateSEOFromFilename } from "./lib/seoGenerator.js"; // ✅ Import your SEO generator
+import mime from "mime";
+import {
+  S3Client,
+  PutObjectCommand
+} from "@aws-sdk/client-s3";
+import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
 dotenv.config();
 
@@ -39,31 +43,41 @@ const imageSchema = new mongoose.Schema({
 const Image = mongoose.model("Image", imageSchema, "images");
 
 // -----------------------------
-// 3️⃣ Backblaze Setup
+// 3️⃣ Cloudflare R2 Setup (S3 Compatible)
 // -----------------------------
-const b2 = new B2({
-  applicationKeyId: process.env.BACKBLAZE_KEY_ID,
-  applicationKey: process.env.BACKBLAZE_APP_KEY,
+const s3Client = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT, // from .env
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+  },
+  forcePathStyle: false
 });
 
-const BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID;
-const BASE_URL = process.env.BACKBLAZE_BASE_URL; // ex: https://f005.backblazeb2.com/file/pexelora-images/
+// fix public URL helper
+function buildR2PublicUrl(fileName) {
+  return `${process.env.R2_PUBLIC_BASE_URL}${encodeURIComponent(fileName)}`;
+}
 
 // -----------------------------
-// 4️⃣ Helper Functions
+// 4️⃣ Deep-Scan Folder Function
 // -----------------------------
 function getAllImages(dir) {
   let results = [];
   const list = fs.readdirSync(dir);
+
   list.forEach(file => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getAllImages(filePath)); // recurse subfolders
+
+    if (stat.isDirectory()) {
+      results = results.concat(getAllImages(filePath)); // recursive
     } else if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
       results.push(filePath);
     }
   });
+
   return results;
 }
 
@@ -77,50 +91,57 @@ async function uploadAll() {
     return;
   }
 
-  await b2.authorize();
   console.log(`🖼️ Found ${files.length} images.`);
 
   for (const filePath of files) {
     const fileName = path.basename(filePath);
 
     try {
-      const uploadUrlResponse = await b2.getUploadUrl({ bucketId: BUCKET_ID });
+      const fileBuffer = fs.readFileSync(filePath);
+      const ext = path.extname(fileName).slice(1);
+      const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Upload using original file name
-      await b2.uploadFile({
-        uploadUrl: uploadUrlResponse.data.uploadUrl,
-        uploadAuthToken: uploadUrlResponse.data.authorizationToken,
-        fileName: fileName,
-        data: fs.readFileSync(filePath),
-      });
+      // Upload to R2
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: fileName,
+          Body: fileBuffer,
+          ContentType: contentType,
+          CacheControl: "public, max-age=31536000, immutable"
+        })
+      );
 
-      // ✅ Generate SEO automatically
+      // SEO generation
       const seo = generateSEOFromFilename(fileName);
 
       await Image.create({
-        name: fileName.toLowerCase().replace(/\s+/g, "-"), // SEO-friendly name
-        fileName,
-        url: `${BASE_URL}${encodeURIComponent(fileName)}`,
+        name: fileName.toLowerCase().replace(/\s+/g, "-"),
+        fileName: fileName,
+        url: buildR2PublicUrl(fileName),
         category: seo.category,
         title: seo.title,
         description: seo.description,
         alt: seo.alt,
         tags: seo.tags,
-        uploadedAt: new Date(),
+        uploadedAt: new Date()
       });
 
-      fs.unlinkSync(filePath); // remove local file
-      console.log(`✅ Uploaded & SEO added: ${fileName}`);
+      // remove local file
+      fs.unlinkSync(filePath);
+
+      console.log(`✅ Uploaded & SEO saved: ${fileName}`);
+
     } catch (err) {
-      console.error(`❌ Failed for ${fileName}:`, err.message);
+      console.error(`❌ Failed: ${fileName}`, err.message);
     }
   }
 
-  console.log("🎉 All images processed successfully!");
+  console.log("🎉 All images uploaded to R2 successfully!");
   process.exit(0);
 }
 
 // -----------------------------
-// 6️⃣ Run
+// 6️⃣ RUN
 // -----------------------------
 uploadAll();
