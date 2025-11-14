@@ -4,6 +4,7 @@ import Image from "../models/Image.js";
 import { generateSEOFromFilename } from "../lib/seoGenerator.js";
 import mime from "mime";
 import sharp from "sharp";
+
 import {
   S3Client,
   PutObjectCommand,
@@ -12,9 +13,9 @@ import {
 
 const router = express.Router();
 
-// ----------------------------------
-// Cloudflare R2 S3 Client
-// ----------------------------------
+/* --------------------------------------------
+   R2 CLIENT
+-------------------------------------------- */
 const s3Client = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
@@ -25,30 +26,33 @@ const s3Client = new S3Client({
   forcePathStyle: false
 });
 
-// Public URL helper (ALWAYS adds slash)
+/* --------------------------------------------
+   PUBLIC URL
+-------------------------------------------- */
 function buildR2PublicUrl(fileName) {
-  return `${process.env.R2_PUBLIC_BASE_URL}/${encodeURIComponent(fileName)}`;
+  let base = process.env.R2_PUBLIC_BASE_URL || "";
+  if (!base.endsWith("/")) base += "/";
+  return `${base}${encodeURIComponent(fileName)}`;
 }
 
-// ----------------------------------
-// Multer memory storage
-// ----------------------------------
+/* --------------------------------------------
+   MULTER MEMORY STORAGE
+-------------------------------------------- */
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ----------------------------------
-// POST /upload → Upload to R2 + Thumbnail + SEO + MongoDB
-// ----------------------------------
+/* --------------------------------------------
+   POST /upload
+-------------------------------------------- */
 router.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const file = req.file;
-    if (!file)
-      return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
+    const file = req.file;
     const originalName = file.originalname.toLowerCase().replace(/\s+/g, "-");
     const ext = originalName.split(".").pop();
     const contentType = mime.getType(ext) || file.mimetype;
 
-    // Upload original file
+    // Upload original
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -59,15 +63,14 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       })
     );
 
-    // Create thumbnail
+    // Upload thumbnail
     const thumbBuffer = await sharp(file.buffer)
-      .resize({ width: 400 })
-      .jpeg({ quality: 70 })
+      .resize({ width: 500 })
+      .jpeg({ quality: 75 })
       .toBuffer();
 
     const thumbnailName = `thumb_${originalName}`;
 
-    // Upload thumbnail
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -78,108 +81,141 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       })
     );
 
-    // Generate SEO info
     const seo = generateSEOFromFilename(originalName);
 
-    // Save to MongoDB
-    const img = new Image({
+    const img = await Image.create({
       name: originalName,
       fileName: originalName,
       thumbnailFileName: thumbnailName,
       url: buildR2PublicUrl(originalName),
-      category: seo.category,
       title: seo.title,
       description: seo.description,
       alt: seo.alt,
+      category: seo.category,
       tags: seo.tags,
       uploadedAt: new Date()
     });
 
-    await img.save();
-
-    res.status(201).json({
-      message: "Image + Thumbnail uploaded to Cloudflare R2 successfully",
-      image: img
-    });
+    res.status(201).json({ message: "Uploaded successfully", image: img });
 
   } catch (err) {
     console.error("❌ Upload error:", err);
-    res.status(500).json({
-      error: "Upload failed",
-      details: err.message
-    });
+    res.status(500).json({ error: "Upload failed", details: err.message });
   }
 });
 
-// ----------------------------------
-// GET /popular
-// ----------------------------------
+/* --------------------------------------------
+   GET /popular
+-------------------------------------------- */
 router.get("/popular", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const total = await Image.countDocuments();
     const images = await Image.find()
+      .sort({ uploadedAt: -1 })
       .skip(skip)
-      .limit(limit)
-      .sort({ uploadedAt: -1 });
+      .limit(limit);
 
     res.json({
       page,
-      total,
-      totalPages: Math.ceil(total / limit),
       images: images.map(img => ({
         _id: img._id,
-        name: img.fileName,
+        title: img.title,
         fileName: img.fileName,
         thumbnailFileName: img.thumbnailFileName,
-        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName || img.fileName)}`,
-        uploadedAt: img.uploadedAt
+        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
       }))
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Popular fetch failed" });
   }
 });
 
-// ----------------------------------
-// GET /search
-// ----------------------------------
+/* --------------------------------------------
+   GET /search?q=
+-------------------------------------------- */
 router.get("/search", async (req, res) => {
   try {
-    const query = req.query.q || "";
+    const q = req.query.q || "";
 
     const images = await Image.find({
-      fileName: { $regex: query, $options: "i" }
-    })
-      .limit(50)
-      .sort({ uploadedAt: -1 });
+      title: { $regex: q, $options: "i" }
+    }).limit(60);
 
-    res.json(
-      images.map(img => ({
+    res.json({
+      images: images.map(img => ({
         _id: img._id,
-        name: img.fileName,
+        title: img.title,
         fileName: img.fileName,
         thumbnailFileName: img.thumbnailFileName,
-        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName || img.fileName)}`,
-        uploadedAt: img.uploadedAt
+        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
       }))
-    );
+    });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Search failed" });
   }
 });
 
-// ----------------------------------
-// ⭐ NEW: GET /api/images/file/:name
-// Streams image from R2
-// ----------------------------------
+/* --------------------------------------------
+   ⭐ GET IMAGE BY ID
+-------------------------------------------- */
+router.get("/id/:id", async (req, res) => {
+  try {
+    const img = await Image.findById(req.params.id);
+
+    if (!img) return res.status(404).json({ error: "Image not found" });
+
+    res.json({
+      _id: img._id,
+      title: img.title,
+      name: img.name,
+      description: img.description,
+      fileName: img.fileName,
+      thumbnailFileName: img.thumbnailFileName,
+      tags: img.tags,
+      category: img.category,
+      url: buildR2PublicUrl(img.fileName),
+      thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch image", details: err.message });
+  }
+});
+
+/* --------------------------------------------
+   ⭐ RELATED IMAGES
+-------------------------------------------- */
+router.get("/related/:cat", async (req, res) => {
+  try {
+    const cat = req.params.cat;
+
+    const images = await Image.find({
+      category: { $regex: cat, $options: "i" }
+    }).limit(20);
+
+    res.json({
+      images: images.map(img => ({
+        _id: img._id,
+        title: img.title,
+        fileName: img.fileName,
+        thumbnailFileName: img.thumbnailFileName,
+        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
+      }))
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load related images" });
+  }
+});
+
+/* --------------------------------------------
+   STREAM FILE FROM R2
+-------------------------------------------- */
 router.get("/file/:name", async (req, res) => {
   try {
     const fileName = decodeURIComponent(req.params.name);
@@ -192,17 +228,12 @@ router.get("/file/:name", async (req, res) => {
     const data = await s3Client.send(command);
 
     res.setHeader("Content-Type", data.ContentType || "image/jpeg");
-
     data.Body.pipe(res);
 
   } catch (err) {
     console.error("❌ File fetch failed:", err);
-    res.status(404).json({
-      error: "File fetch failed",
-      details: err.message
-    });
+    res.status(404).json({ error: "File not found" });
   }
 });
 
-// ----------------------------------
 export default router;

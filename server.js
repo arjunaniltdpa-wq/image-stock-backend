@@ -46,6 +46,9 @@ app.use(express.json());
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
 
+// ✅ FIX — IMAGE ROUTES MUST BE AT THE TOP
+app.use("/api/images", imageRoutes);
+
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
@@ -308,9 +311,6 @@ app.get("/api/get-file-url/:fileName", async (req, res) => {
   }
 });
 
-// Image Routes
-app.use("/api/images", imageRoutes);
-
 // Static uploads folder
 const localUploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(localUploadDir)) fs.mkdirSync(localUploadDir);
@@ -357,7 +357,7 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
       page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
 
       const pdfBytes = await pdfDoc.save();
-      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Type", "application/pdf"); 
       return res.send(Buffer.from(pdfBytes));
     }
 
@@ -377,5 +377,5 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 // Server
-const PORT = process.env.PORT   || 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Running on ${PORT}`));
