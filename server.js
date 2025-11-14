@@ -64,9 +64,11 @@ const s3Client = new S3Client({
   forcePathStyle: false,
 });
 
-// Build public file URL (public bucket)
+// FIXED HERE ✔✔✔
 function buildR2PublicUrl(fileName) {
-  return `${process.env.R2_PUBLIC_BASE_URL}${encodeURIComponent(fileName)}`;
+  let base = process.env.R2_PUBLIC_BASE_URL || "";
+  if (!base.endsWith("/")) base += "/";
+  return `${base}${encodeURIComponent(fileName)}`;
 }
 
 // Presigned private URL (if needed)
@@ -129,7 +131,6 @@ async function uploadLocalFolderToR2() {
         })
       );
 
-      // SEO
       const seo = generateSEOFromFilename(fileName);
 
       await Image.create({
@@ -376,5 +377,5 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 // Server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT   || 3000;
 app.listen(PORT, () => console.log(`🚀 Running on ${PORT}`));

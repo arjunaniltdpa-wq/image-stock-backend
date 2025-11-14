@@ -6,7 +6,8 @@ import mime from "mime";
 import sharp from "sharp";
 import {
   S3Client,
-  PutObjectCommand
+  PutObjectCommand,
+  GetObjectCommand
 } from "@aws-sdk/client-s3";
 
 const router = express.Router();
@@ -24,9 +25,9 @@ const s3Client = new S3Client({
   forcePathStyle: false
 });
 
-// Public URL helper
+// Public URL helper (ALWAYS adds slash)
 function buildR2PublicUrl(fileName) {
-  return `${process.env.R2_PUBLIC_BASE_URL}${encodeURIComponent(fileName)}`;
+  return `${process.env.R2_PUBLIC_BASE_URL}/${encodeURIComponent(fileName)}`;
 }
 
 // ----------------------------------
@@ -47,9 +48,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     const ext = originalName.split(".").pop();
     const contentType = mime.getType(ext) || file.mimetype;
 
-    // ----------------------------------
-    // 1️⃣ Upload ORIGINAL image to R2
-    // ----------------------------------
+    // Upload original file
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -60,9 +59,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       })
     );
 
-    // ----------------------------------
-    // 2️⃣ Create THUMBNAIL (400px)
-    // ----------------------------------
+    // Create thumbnail
     const thumbBuffer = await sharp(file.buffer)
       .resize({ width: 400 })
       .jpeg({ quality: 70 })
@@ -70,9 +67,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 
     const thumbnailName = `thumb_${originalName}`;
 
-    // ----------------------------------
-    // 3️⃣ Upload THUMBNAIL to R2
-    // ----------------------------------
+    // Upload thumbnail
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -83,14 +78,10 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       })
     );
 
-    // ----------------------------------
-    // 4️⃣ Generate SEO
-    // ----------------------------------
+    // Generate SEO info
     const seo = generateSEOFromFilename(originalName);
 
-    // ----------------------------------
-    // 5️⃣ Save to MongoDB
-    // ----------------------------------
+    // Save to MongoDB
     const img = new Image({
       name: originalName,
       fileName: originalName,
@@ -121,7 +112,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 });
 
 // ----------------------------------
-// GET /popular (unchanged)
+// GET /popular
 // ----------------------------------
 router.get("/popular", async (req, res) => {
   try {
@@ -142,6 +133,8 @@ router.get("/popular", async (req, res) => {
       images: images.map(img => ({
         _id: img._id,
         name: img.fileName,
+        fileName: img.fileName,
+        thumbnailFileName: img.thumbnailFileName,
         url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName || img.fileName)}`,
         uploadedAt: img.uploadedAt
       }))
@@ -154,7 +147,7 @@ router.get("/popular", async (req, res) => {
 });
 
 // ----------------------------------
-// GET /search (unchanged)
+// GET /search
 // ----------------------------------
 router.get("/search", async (req, res) => {
   try {
@@ -170,6 +163,8 @@ router.get("/search", async (req, res) => {
       images.map(img => ({
         _id: img._id,
         name: img.fileName,
+        fileName: img.fileName,
+        thumbnailFileName: img.thumbnailFileName,
         url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName || img.fileName)}`,
         uploadedAt: img.uploadedAt
       }))
@@ -181,4 +176,33 @@ router.get("/search", async (req, res) => {
   }
 });
 
+// ----------------------------------
+// ⭐ NEW: GET /api/images/file/:name
+// Streams image from R2
+// ----------------------------------
+router.get("/file/:name", async (req, res) => {
+  try {
+    const fileName = decodeURIComponent(req.params.name);
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: fileName
+    });
+
+    const data = await s3Client.send(command);
+
+    res.setHeader("Content-Type", data.ContentType || "image/jpeg");
+
+    data.Body.pipe(res);
+
+  } catch (err) {
+    console.error("❌ File fetch failed:", err);
+    res.status(404).json({
+      error: "File fetch failed",
+      details: err.message
+    });
+  }
+});
+
+// ----------------------------------
 export default router;
