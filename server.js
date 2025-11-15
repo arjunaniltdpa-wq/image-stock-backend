@@ -46,20 +46,24 @@ app.use(express.json());
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ✅ FIX — IMAGE ROUTES MUST BE AT THE TOP
-app.use("/api/images", imageRoutes);
-
+// ---------------------------
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
+// ---------------------------
+mongoose.connect(process.env.MONGO_URI, {})
   .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ MongoDB connection error:", err));
+  .catch(err => console.error("❌ MongoDB error:", err));
 
 // ---------------------------
-// Cloudflare R2 SETUP (S3-Compatible)
+// API ROUTES
+// ---------------------------
+app.use("/api/images", imageRoutes);
+
+// ---------------------------
+// Cloudflare R2 SETUP
 // ---------------------------
 const s3Client = new S3Client({
   region: "auto",
-  endpoint: process.env.R2_ENDPOINT, // from .env
+  endpoint: process.env.R2_ENDPOINT,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
@@ -67,39 +71,30 @@ const s3Client = new S3Client({
   forcePathStyle: false,
 });
 
+// Build public R2 URL
 function buildR2PublicUrl(fileName) {
   let base = process.env.R2_PUBLIC_BASE_URL || "";
   if (!base.endsWith("/")) base += "/";
-
-  const cdnUrl = `${base}${encodeURIComponent(fileName)}`;
-
-  // ⚡ Cloudflare CDN Optimized URL (Option B)
-  return `https://pixeora.com/cdn-cgi/image/w=600,q=85,f=auto/${cdnUrl}`;
+  return `${base}${encodeURIComponent(fileName)}`;
 }
 
-
-// Presigned private URL (if needed)
 async function getR2PresignedUrl(key, expiresSeconds = 3600) {
   const command = new GetObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME,
     Key: key,
   });
-
   return await getSignedUrl(s3Client, command, { expiresIn: expiresSeconds });
 }
 
 const BULK_UPLOAD_FOLDER = path.join(__dirname, "image-to-upload");
 
-// ---------------------------
-// BULK Upload to R2 (SEO + Thumb)
-// ---------------------------
+// Bulk Upload Function
 async function uploadLocalFolderToR2() {
+  if (!fs.existsSync(BULK_UPLOAD_FOLDER)) return;
+
   const files = fs.readdirSync(BULK_UPLOAD_FOLDER).filter(f =>
     /\.(jpg|jpeg|png|webp)$/i.test(f)
   );
-
-  if (files.length === 0)
-    return console.log("No files in image-to-upload");
 
   for (const fileName of files) {
     const filePath = path.join(BULK_UPLOAD_FOLDER, fileName);
@@ -109,7 +104,7 @@ async function uploadLocalFolderToR2() {
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Main image upload
+      // Upload main image
       await s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
@@ -120,7 +115,7 @@ async function uploadLocalFolderToR2() {
         })
       );
 
-      // Thumbnail upload
+      // Upload thumb
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
@@ -153,18 +148,16 @@ async function uploadLocalFolderToR2() {
       });
 
       fs.unlinkSync(filePath);
-      console.log(`✅ Uploaded to R2: ${fileName}`);
+      console.log(`Uploaded: ${fileName}`);
 
     } catch (err) {
-      console.error(`❌ Failed: ${fileName}`, err.message);
+      console.error("Bulk Upload Error:", err.message);
     }
   }
-
-  console.log("🎉 ALL BULK UPLOADED TO R2.");
 }
 
 // ---------------------------
-// Cloudinary config
+// Cloudinary Config
 // ---------------------------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -172,160 +165,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Popular Images Endpoint
-app.get("/api/images/popular", async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    const images = await Image.find()
-      .sort({ uploadedAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const data = images.map(img => ({
-      _id: img._id,
-      name: img.name || img.fileName,
-      url: `/api/images/file/${encodeURIComponent(img.fileName)}`,
-      thumbnailUrl: `/api/images/file/${encodeURIComponent(img.thumbnailFileName || img.fileName)}`,
-      tags: img.tags || [],
-    }));
-
-    res.json({ images: data });
-  } catch (err) {
-    res.status(500).json({ message: "Failed", details: err.message });
-  }
-});
-
 // ---------------------------
-// Single IMAGE UPLOAD → R2
-// ---------------------------
-app.post("/upload", upload.single("image"), async (req, res) => {
-  try {
-    if (!req.file)
-      return res.status(400).json({ error: "No file" });
-
-    const buffer = req.file.buffer;
-    const originalName = req.file.originalname;
-    const ext = path.extname(originalName).slice(1);
-    const contentType = mime.getType(ext) || req.file.mimetype;
-
-    // Upload original
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: originalName,
-        Body: buffer,
-        ContentType: contentType,
-        CacheControl: "public, max-age=31536000, immutable",
-      })
-    );
-
-    // Upload thumbnail
-    const thumbBuffer = await sharp(buffer)
-      .resize({ width: 400 })
-      .jpeg({ quality: 70 })
-      .toBuffer();
-
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: `thumb_${originalName}`,
-        Body: thumbBuffer,
-        ContentType: "image/jpeg",
-        CacheControl: "public, max-age=31536000, immutable",
-      })
-    );
-
-    const seo = generateSEOFromFilename(originalName);
-
-    const imageDoc = await Image.create({
-      name: seo.title,
-      fileName: originalName,
-      url: buildR2PublicUrl(originalName),
-      thumbnailFileName: `thumb_${originalName}`,
-      category: seo.category,
-      tags: seo.tags,
-      description: seo.description,
-      altText: seo.alt,
-      uploadedAt: new Date(),
-    });
-
-    res.json({
-      message: "Uploaded to R2",
-      fileName: originalName,
-      seo,
-      url: imageDoc.url
-    });
-
-  } catch (err) {
-    res.status(500).json({ error: "Upload failed", details: err.message });
-  }
-});
-
-// ---------------------------
-// PUBLIC IMAGE PROXY + RESIZE
-// ---------------------------
-app.get("/api/images/file/:fileName", async (req, res) => {
-  try {
-    const fileName = decodeURIComponent(req.params.fileName);
-
-    const publicUrl = buildR2PublicUrl(fileName);
-
-    const response = await axios.get(publicUrl, {
-      responseType: "arraybuffer",
-    });
-
-    const imageBuffer = Buffer.from(response.data);
-
-    let finalBuffer = imageBuffer;
-
-    const width = req.query.width ? parseInt(req.query.width) : null;
-    const height = req.query.height ? parseInt(req.query.height) : null;
-    const crop = req.query.crop;
-
-    if (width || height || crop === "true") {
-      let sharpOptions = { fit: "inside" };
-      if (crop === "true")
-        sharpOptions = { fit: "cover", position: "center" };
-
-      finalBuffer = await sharp(imageBuffer)
-        .resize(width, height, sharpOptions)
-        .jpeg({ quality: 80 })
-        .toBuffer();
-    }
-
-    res.setHeader("Content-Type", "image/jpeg");
-    res.send(finalBuffer);
-
-  } catch (err) {
-    res.status(500).json({ error: "File fetch failed", details: err.message });
-  }
-});
-
-// Signed URL (optional)
-app.get("/api/get-file-url/:fileName", async (req, res) => {
-  try {
-    const fileName = decodeURIComponent(req.params.fileName);
-    const url = buildR2PublicUrl(fileName);
-    res.json({ url });
-  } catch (err) {
-    res.status(500).json({ message: "Failed", details: err.message });
-  }
-});
-
 // Static uploads folder
+// ---------------------------
 const localUploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(localUploadDir)) fs.mkdirSync(localUploadDir);
 app.use("/uploads", express.static(localUploadDir));
 
 // Root
-app.get("/", (req, res) =>
-  res.send("Backend live with Cloudflare R2!")
-);
+app.get("/", (req, res) => res.send("Backend live with Cloudflare R2!"));
 
-// Compression
+// Compression API
 app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   try {
     const buffer = await sharp(req.file.buffer)
@@ -337,16 +187,14 @@ app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   }
 });
 
-// Conversion
+// Conversion API
 app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   try {
     const format = req.body.format?.toLowerCase();
-    if (!format)
-      return res.status(400).json({ message: "No format" });
+    if (!format) return res.status(400).json({ message: "No format" });
 
     const valid = ["jpg", "jpeg", "png", "webp", "tiff", "pdf"];
-    if (!valid.includes(format))
-      return res.status(400).json({ message: "Invalid format" });
+    if (!valid.includes(format)) return res.status(400).json({ message: "Invalid format" });
 
     if (format === "pdf") {
       const pdfDoc = await PDFDocument.create();
@@ -361,7 +209,7 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
       page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
 
       const pdfBytes = await pdfDoc.save();
-      res.setHeader("Content-Type", "application/pdf"); 
+      res.setHeader("Content-Type", "application/pdf");
       return res.send(Buffer.from(pdfBytes));
     }
 
@@ -377,9 +225,26 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   }
 });
 
-// Serve frontend
+// -------------------------------------------------
+// ⭐ FIXED FRONTEND SERVING (Express 5 compatible)
+// -------------------------------------------------
+
 app.use(express.static(path.join(__dirname, "public")));
 
-// Server
+// -------------------------------------------------
+// SPA FALLBACK — EXPRESS 5 FIX
+// -------------------------------------------------
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith("/api/")) {
+    return res.status(404).json({ error: "API endpoint not found" });
+  }
+
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+
+// ---------------------------
+// Start server
+// ---------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Running on ${PORT}`));

@@ -4,6 +4,7 @@ import Image from "../models/Image.js";
 import { generateSEOFromFilename } from "../lib/seoGenerator.js";
 import mime from "mime";
 import sharp from "sharp";
+import axios from "axios";
 
 import {
   S3Client,
@@ -27,7 +28,7 @@ const s3Client = new S3Client({
 });
 
 /* --------------------------------------------
-   PUBLIC URL
+   PUBLIC URL BUILDER
 -------------------------------------------- */
 function buildR2PublicUrl(fileName) {
   let base = process.env.R2_PUBLIC_BASE_URL || "";
@@ -36,12 +37,12 @@ function buildR2PublicUrl(fileName) {
 }
 
 /* --------------------------------------------
-   MULTER MEMORY STORAGE
+   MULTER STORAGE
 -------------------------------------------- */
 const upload = multer({ storage: multer.memoryStorage() });
 
 /* --------------------------------------------
-   POST /upload
+   UPLOAD ROUTE
 -------------------------------------------- */
 router.post("/upload", upload.single("image"), async (req, res) => {
   try {
@@ -97,15 +98,14 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     });
 
     res.status(201).json({ message: "Uploaded successfully", image: img });
-
   } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({ error: "Upload failed", details: err.message });
+    console.error("❌ Upload Error:", err);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
 /* --------------------------------------------
-   GET /popular
+   POPULAR IMAGES
 -------------------------------------------- */
 router.get("/popular", async (req, res) => {
   try {
@@ -128,14 +128,13 @@ router.get("/popular", async (req, res) => {
         url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
       }))
     });
-
   } catch (err) {
     res.status(500).json({ error: "Popular fetch failed" });
   }
 });
 
 /* --------------------------------------------
-   GET /search?q=
+   SEARCH
 -------------------------------------------- */
 router.get("/search", async (req, res) => {
   try {
@@ -154,14 +153,13 @@ router.get("/search", async (req, res) => {
         url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
       }))
     });
-
   } catch (err) {
     res.status(500).json({ error: "Search failed" });
   }
 });
 
 /* --------------------------------------------
-   ⭐ GET IMAGE BY ID
+   GET IMAGE BY ID
 -------------------------------------------- */
 router.get("/id/:id", async (req, res) => {
   try {
@@ -181,14 +179,13 @@ router.get("/id/:id", async (req, res) => {
       url: buildR2PublicUrl(img.fileName),
       thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
     });
-
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch image", details: err.message });
+    res.status(500).json({ error: "Fetch failed" });
   }
 });
 
 /* --------------------------------------------
-   ⭐ RELATED IMAGES
+   RELATED IMAGES
 -------------------------------------------- */
 router.get("/related/:cat", async (req, res) => {
   try {
@@ -207,14 +204,58 @@ router.get("/related/:cat", async (req, res) => {
         url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
       }))
     });
-
   } catch (err) {
-    res.status(500).json({ error: "Failed to load related images" });
+    res.status(500).json({ error: "Failed" });
   }
 });
 
 /* --------------------------------------------
-   STREAM FILE FROM R2
+   ⭐ FINAL — DOWNLOAD HANDLER (MUST COME BEFORE /file/:name)
+-------------------------------------------- */
+router.get("/download/:fileName", async (req, res) => {
+  try {
+    let incoming = decodeURIComponent(req.params.fileName);
+    console.log("\n🔥 Incoming request:", incoming);
+
+    // Convert hyphens → underscores
+    const normalized = incoming.replace(/-/g, "_");
+    console.log("🔧 Normalized:", normalized);
+
+    // Try match in DB
+    let image = await Image.findOne({ fileName: normalized });
+
+    if (!image) {
+      console.log("🔄 Trying original:", incoming);
+      image = await Image.findOne({ fileName: incoming });
+    }
+
+    if (!image) {
+      console.log("❌ No match in DB for:", incoming);
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    console.log("✅ Matched:", image.fileName);
+
+    const fileUrl = `${process.env.R2_PUBLIC_BASE_URL}/${encodeURIComponent(image.fileName)}`;
+
+    const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+
+    res.set({
+      "Content-Type": response.headers["content-type"],
+      "Content-Length": response.headers["content-length"],
+      "Content-Disposition": `attachment; filename="${image.fileName}"`,
+    });
+
+    res.send(response.data);
+  } catch (err) {
+    console.error("🔥 Download error:", err);
+    res.status(500).json({ error: "Download failed" });
+  }
+});
+
+
+/* --------------------------------------------
+   STREAM FILE FROM R2 (MUST COME AFTER DOWNLOAD)
 -------------------------------------------- */
 router.get("/file/:name", async (req, res) => {
   try {
@@ -229,7 +270,6 @@ router.get("/file/:name", async (req, res) => {
 
     res.setHeader("Content-Type", data.ContentType || "image/jpeg");
     data.Body.pipe(res);
-
   } catch (err) {
     console.error("❌ File fetch failed:", err);
     res.status(404).json({ error: "File not found" });
