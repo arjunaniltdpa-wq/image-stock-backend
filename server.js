@@ -225,23 +225,12 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   }
 });
 
-// -------------------------------------------------
-// ⭐ FIXED FRONTEND SERVING (Express 5 compatible)
-// -------------------------------------------------
-
-app.use(express.static(path.join(__dirname, "public")));
-
-// -------------------------------------------------
-// SPA FALLBACK — EXPRESS 5 FIX
-// -------------------------------------------------
-app.use((req, res, next) => {
-  if (req.originalUrl.startsWith("/api/")) {
-    return res.status(404).json({ error: "API endpoint not found" });
-  }
-
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// ---------------------------
+// Root test endpoint
+// ---------------------------
+app.get("/", (req, res) => {
+  res.json({ status: "Pixeora API running" });
 });
-
 
 // ---------------------------
 // Start server
