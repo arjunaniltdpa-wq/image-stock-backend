@@ -67,12 +67,16 @@ const s3Client = new S3Client({
   forcePathStyle: false,
 });
 
-// FIXED HERE ✔✔✔
 function buildR2PublicUrl(fileName) {
   let base = process.env.R2_PUBLIC_BASE_URL || "";
   if (!base.endsWith("/")) base += "/";
-  return `${base}${encodeURIComponent(fileName)}`;
+
+  const cdnUrl = `${base}${encodeURIComponent(fileName)}`;
+
+  // ⚡ Cloudflare CDN Optimized URL (Option B)
+  return `https://pixeora.com/cdn-cgi/image/w=600,q=85,f=auto/${cdnUrl}`;
 }
+
 
 // Presigned private URL (if needed)
 async function getR2PresignedUrl(key, expiresSeconds = 3600) {
