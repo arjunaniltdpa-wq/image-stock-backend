@@ -18,7 +18,6 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import mime from "mime";
 
-// SEO IMPORT
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
 // AWS SDK v3 for Cloudflare R2
@@ -104,7 +103,6 @@ async function uploadLocalFolderToR2() {
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Upload main image
       await s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
@@ -115,7 +113,6 @@ async function uploadLocalFolderToR2() {
         })
       );
 
-      // Upload thumb
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
@@ -172,10 +169,9 @@ const localUploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(localUploadDir)) fs.mkdirSync(localUploadDir);
 app.use("/uploads", express.static(localUploadDir));
 
-// Root
-app.get("/", (req, res) => res.send("Backend live with Cloudflare R2!"));
-
+// ---------------------------
 // Compression API
+// ---------------------------
 app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   try {
     const buffer = await sharp(req.file.buffer)
@@ -187,7 +183,9 @@ app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   }
 });
 
+// ---------------------------
 // Conversion API
+// ---------------------------
 app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   try {
     const format = req.body.format?.toLowerCase();
@@ -226,14 +224,14 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 });
 
 // ---------------------------
-// Root test endpoint
+// FINAL ROOT ROUTE (only one)
 // ---------------------------
 app.get("/", (req, res) => {
   res.json({ status: "Pixeora API running" });
 });
 
 // ---------------------------
-// Start server
+// START SERVER
 // ---------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Running on ${PORT}`));

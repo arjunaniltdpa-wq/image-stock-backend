@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import multer from "multer";
 import Image from "../models/Image.js";
@@ -53,7 +56,6 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     const ext = originalName.split(".").pop();
     const contentType = mime.getType(ext) || file.mimetype;
 
-    // Upload original
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -64,7 +66,6 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       })
     );
 
-    // Upload thumbnail
     const thumbBuffer = await sharp(file.buffer)
       .resize({ width: 500 })
       .jpeg({ quality: 75 })
@@ -164,7 +165,6 @@ router.get("/search", async (req, res) => {
 router.get("/id/:id", async (req, res) => {
   try {
     const img = await Image.findById(req.params.id);
-
     if (!img) return res.status(404).json({ error: "Image not found" });
 
     res.json({
@@ -209,53 +209,84 @@ router.get("/related/:cat", async (req, res) => {
   }
 });
 
-/* --------------------------------------------
-   ⭐ FINAL — DOWNLOAD HANDLER (MUST COME BEFORE /file/:name)
--------------------------------------------- */
 router.get("/download/:fileName", async (req, res) => {
   try {
-    let incoming = decodeURIComponent(req.params.fileName);
-    console.log("\n🔥 Incoming request:", incoming);
+    let incoming = decodeURIComponent(req.params.fileName).trim();
 
-    // Convert hyphens → underscores
-    const normalized = incoming.replace(/-/g, "_");
-    console.log("🔧 Normalized:", normalized);
+    console.log("\n🔥 Incoming =", incoming);
 
-    // Try match in DB
-    let image = await Image.findOne({ fileName: normalized });
+    // Allowed extensions
+    const extensions = ["jpg", "jpeg", "png", "webp"];
 
+    // Detect extension
+    const ext = incoming.split(".").pop().toLowerCase();
+    const hasExt = extensions.includes(ext);
+    const base = hasExt ? incoming.slice(0, -(ext.length + 1)) : incoming;
+
+    // Generate base variations
+    const baseVariations = [
+      base,
+      base.toLowerCase(),
+      base.toUpperCase(),
+      base.replace(/-/g, "_"),
+      base.replace(/_/g, "-"),
+      base.replace(/[^a-zA-Z0-9]/g, "_"),
+      base.replace(/[^a-zA-Z0-9]/g, "-")
+    ];
+
+    // Generate full filename variations with extension
+    const fullVariations = [];
+    for (const b of baseVariations) {
+      for (const e of extensions) {
+        fullVariations.push(`${b}.${e}`);
+      }
+    }
+
+    const variations = [
+      incoming,
+      incoming.toLowerCase(),
+      incoming.toUpperCase(),
+      ...fullVariations
+    ];
+
+    console.log("🔍 Variations:", variations);
+
+    // 1. Try exact match
+    let image = await Image.findOne({ fileName: { $in: variations } });
+
+    // 2. Fuzzy regex fallback
     if (!image) {
-      console.log("🔄 Trying original:", incoming);
-      image = await Image.findOne({ fileName: incoming });
+      const regex = new RegExp(base.replace(/[^a-zA-Z0-9]/g, ".?"), "i");
+      image = await Image.findOne({ fileName: regex });
     }
 
     if (!image) {
-      console.log("❌ No match in DB for:", incoming);
+      console.log("❌ No match found");
       return res.status(404).json({ error: "File not found" });
     }
 
-    console.log("✅ Matched:", image.fileName);
+    console.log("✅ MATCH FOUND =", image.fileName);
 
+    // Fetch file from R2
     const fileUrl = `${process.env.R2_PUBLIC_BASE_URL}/${encodeURIComponent(image.fileName)}`;
-
     const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
 
     res.set({
       "Content-Type": response.headers["content-type"],
-      "Content-Length": response.headers["content-length"],
       "Content-Disposition": `attachment; filename="${image.fileName}"`,
     });
 
     res.send(response.data);
+
   } catch (err) {
-    console.error("🔥 Download error:", err);
+    console.error("🔥 Download error:", err.message);
     res.status(500).json({ error: "Download failed" });
   }
 });
 
 
 /* --------------------------------------------
-   STREAM FILE FROM R2 (MUST COME AFTER DOWNLOAD)
+   STREAM FILE FROM R2
 -------------------------------------------- */
 router.get("/file/:name", async (req, res) => {
   try {
