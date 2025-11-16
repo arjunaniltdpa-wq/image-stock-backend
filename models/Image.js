@@ -17,9 +17,12 @@ router.get("/", async (req, res) => {
         { category: { $regex: q, $options: "i" } },
         { secondaryCategory: { $regex: q, $options: "i" } },
         { tags: { $regex: q, $options: "i" } },
-        { keywords: { $regex: q, $options: "i" } }
+        { keywords: { $regex: q, $options: "i" } },
+        { alt: { $regex: q, $options: "i" } }       // 🔥 missing earlier
       ]
-    }).limit(200);
+    })
+      .limit(200)
+      .sort({ uploadedAt: -1 }); // newest first
 
     res.json(results);
 

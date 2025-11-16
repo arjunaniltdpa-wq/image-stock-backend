@@ -20,7 +20,7 @@ router.get("/", async (req, res) => {
         { category: regex },
         { secondaryCategory: regex },
         { fileName: regex },
-        { alt: regex }
+        { alt: regex }          // correct field for ALT text
       ]
     })
       .limit(200)

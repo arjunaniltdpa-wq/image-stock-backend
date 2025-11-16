@@ -17,16 +17,16 @@ import { fileURLToPath } from "url";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import mime from "mime";
-
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
-
+// SEARCH ROUTES (must be before other routes)
+import searchRoutes from "./routes/search.js";
 
 // AWS SDK v3 for Cloudflare R2
 import {
   S3Client,
   PutObjectCommand,
-  GetObjectCommand
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -44,9 +44,8 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-import searchRoutes from "./routes/search.js";
+// Register Search route
 app.use("/api/search", searchRoutes);
-
 
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -54,9 +53,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ---------------------------
 // MongoDB connection
 // ---------------------------
-mongoose.connect(process.env.MONGO_URI, {})
+mongoose
+  .connect(process.env.MONGO_URI, {})
   .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ MongoDB error:", err));
+  .catch((err) => console.error("❌ MongoDB error:", err));
 
 // ---------------------------
 // API ROUTES
@@ -104,7 +104,7 @@ async function retry(fn, attempts = 3, delay = 1200) {
     } catch (err) {
       lastError = err;
       console.log(`Retry ${i + 1} failed: ${err.message}`);
-      await new Promise(res => setTimeout(res, delay));
+      await new Promise((res) => setTimeout(res, delay));
     }
   }
   throw lastError;
@@ -127,14 +127,14 @@ function writeFallbackLog(file, data) {
 }
 
 // ======================================================
-// UPDATED — BULK UPLOAD FUNCTION WITH RETRY + LOGGING
+// BULK UPLOAD FUNCTION (FINAL FIXED VERSION)
 // ======================================================
 async function uploadLocalFolderToR2() {
   if (!fs.existsSync(BULK_UPLOAD_FOLDER)) return;
 
-  const files = fs.readdirSync(BULK_UPLOAD_FOLDER).filter(f =>
-    /\.(jpg|jpeg|png|webp)$/i.test(f)
-  );
+  const files = fs
+    .readdirSync(BULK_UPLOAD_FOLDER)
+    .filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f));
 
   for (const fileName of files) {
     const filePath = path.join(BULK_UPLOAD_FOLDER, fileName);
@@ -144,7 +144,6 @@ async function uploadLocalFolderToR2() {
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Unique name to allow duplicates
       const uniqueName = `${Date.now()}-${fileName}`;
 
       // Upload original with retry
@@ -160,7 +159,7 @@ async function uploadLocalFolderToR2() {
         );
       });
 
-      // Create thumbnail
+      // Thumbnail generation
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
@@ -168,7 +167,6 @@ async function uploadLocalFolderToR2() {
 
       const thumbName = `thumb_${uniqueName}`;
 
-      // Upload thumbnail with retry
       await retry(async () => {
         return await s3Client.send(
           new PutObjectCommand({
@@ -181,17 +179,19 @@ async function uploadLocalFolderToR2() {
         );
       });
 
+      // SEO GENERATION
       const seo = generateSEOFromFilename(fileName);
 
-      // Save metadata to MongoDB with retry + fallback if fails
+      // Save metadata to MongoDB
       await retry(async () => {
         return await Image.create({
+          // FIX: save clean SEO fields
           name: seo.title,
           title: seo.title,
           fileName: uniqueName,
           thumbnailFileName: thumbName,
-          url: buildR2PublicUrl(uniqueName),
           thumbnailUrl: buildR2PublicUrl(thumbName),
+          url: buildR2PublicUrl(uniqueName),
           category: seo.category,
           secondaryCategory: seo.secondaryCategory,
           tags: seo.tags,
@@ -200,18 +200,10 @@ async function uploadLocalFolderToR2() {
           alt: seo.alt,
           uploadedAt: new Date(),
         });
-      }).catch(err => {
-        writeFallbackLog("mongo_fallback.json", {
-          file: uniqueName,
-          error: err.message,
-          time: new Date(),
-        });
-        throw err;
       });
 
       fs.unlinkSync(filePath);
       console.log(`Uploaded: ${uniqueName}`);
-
     } catch (err) {
       console.error("Bulk Upload Error:", err.message);
 
@@ -245,9 +237,7 @@ app.use("/uploads", express.static(localUploadDir));
 // ---------------------------
 app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   try {
-    const buffer = await sharp(req.file.buffer)
-      .jpeg({ quality: 60 })
-      .toBuffer();
+    const buffer = await sharp(req.file.buffer).jpeg({ quality: 60 }).toBuffer();
     res.send(buffer);
   } catch (err) {
     res.status(500).json({ message: "Failed", details: err.message });
@@ -289,7 +279,6 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 
     res.setHeader("Content-Type", mime.getType(format));
     res.send(converted);
-
   } catch (err) {
     res.status(500).json({ message: "Conversion failed", details: err.message });
   }
@@ -300,21 +289,17 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 // ---------------------------
 app.post("/api/upload", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.file)
       return res.status(400).json({ success: false, message: "No image uploaded" });
-    }
 
     const originalName = req.file.originalname;
     const buffer = req.file.buffer;
 
-    // Create unique filename
     const uniqueName = `${Date.now()}-${originalName}`;
-
-    // Detect content type
     const ext = path.extname(originalName).slice(1).toLowerCase();
     const contentType = mime.getType(ext) || "application/octet-stream";
 
-    // ---- Upload to R2 with Retry ----
+    // Upload original
     await retry(async () => {
       return await s3Client.send(
         new PutObjectCommand({
@@ -327,7 +312,7 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
       );
     });
 
-    // ---- Generate thumbnail ----
+    // Thumbnail
     const thumbBuffer = await sharp(buffer)
       .resize({ width: 400 })
       .jpeg({ quality: 70 })
@@ -335,7 +320,6 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
 
     const thumbName = `thumb_${uniqueName}`;
 
-    // ---- Upload thumbnail with retry ----
     await retry(async () => {
       return await s3Client.send(
         new PutObjectCommand({
@@ -348,18 +332,18 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
       );
     });
 
-    // ---- SEO Generation ----
+    // SEO
     const seo = generateSEOFromFilename(originalName);
 
-    // ---- Save to MongoDB (retry + fallback) ----
+    // Save in DB
     await retry(async () => {
       return await Image.create({
         name: seo.title,
         title: seo.title,
         fileName: uniqueName,
         thumbnailFileName: thumbName,
-        url: buildR2PublicUrl(uniqueName),
         thumbnailUrl: buildR2PublicUrl(thumbName),
+        url: buildR2PublicUrl(uniqueName),
         category: seo.category,
         secondaryCategory: seo.secondaryCategory,
         tags: seo.tags,
@@ -368,39 +352,27 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
         alt: seo.alt,
         uploadedAt: new Date(),
       });
-    }).catch(err => {
-      writeFallbackLog("mongo_fallback.json", {
-        file: uniqueName,
-        error: err.message,
-        time: new Date(),
-      });
-      throw err;
     });
 
-    // SUCCESS RESPONSE
     res.json({
       success: true,
       url: buildR2PublicUrl(uniqueName),
       thumbnailUrl: buildR2PublicUrl(thumbName),
     });
-
   } catch (err) {
-    console.error("Single Upload Error:", err.message);
-
     writeFallbackLog("failed_uploads.json", {
       file: req.file?.originalname,
       error: err.message,
       time: new Date(),
     });
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Upload failed",
-      error: err.message
+      error: err.message,
     });
   }
 });
-
 
 // ---------------------------
 // FINAL ROOT ROUTE
