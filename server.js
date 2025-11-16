@@ -20,6 +20,8 @@ import mime from "mime";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
+
+
 // AWS SDK v3 for Cloudflare R2
 import {
   S3Client,
@@ -41,6 +43,10 @@ const app = express();
 // Middleware
 app.use(cors({ origin: "*" }));
 app.use(express.json());
+
+import searchRoutes from "./routes/search.js";
+app.use("/api/search", searchRoutes);
+
 
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -181,13 +187,17 @@ async function uploadLocalFolderToR2() {
       await retry(async () => {
         return await Image.create({
           name: seo.title,
+          title: seo.title,
           fileName: uniqueName,
           thumbnailFileName: thumbName,
           url: buildR2PublicUrl(uniqueName),
+          thumbnailUrl: buildR2PublicUrl(thumbName),
           category: seo.category,
+          secondaryCategory: seo.secondaryCategory,
           tags: seo.tags,
+          keywords: seo.keywords,
           description: seo.description,
-          altText: seo.alt,
+          alt: seo.alt,
           uploadedAt: new Date(),
         });
       }).catch(err => {
@@ -345,13 +355,17 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     await retry(async () => {
       return await Image.create({
         name: seo.title,
+        title: seo.title,
         fileName: uniqueName,
         thumbnailFileName: thumbName,
         url: buildR2PublicUrl(uniqueName),
+        thumbnailUrl: buildR2PublicUrl(thumbName),
         category: seo.category,
+        secondaryCategory: seo.secondaryCategory,
         tags: seo.tags,
+        keywords: seo.keywords,
         description: seo.description,
-        altText: seo.alt,
+        alt: seo.alt,
         uploadedAt: new Date(),
       });
     }).catch(err => {

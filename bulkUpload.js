@@ -1,39 +1,33 @@
-// bulkUpload.js (FULL FIXED VERSION — MATCHES server.js)
+// bulkUpload.js (FINAL FIXED VERSION)
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import mime from "mime";
 import sharp from "sharp";
-import {
-  S3Client,
-  PutObjectCommand
-} from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 import Image from "./models/Image.js";
 
 dotenv.config();
 
-// -----------------------------
+// -------------------------------------------------
 // 1️⃣ Config
-// -----------------------------
+// -------------------------------------------------
 const FOLDER_PATH = "./image-to-upload";
 if (!fs.existsSync(FOLDER_PATH)) {
   console.log("❌ Folder 'image-to-upload' not found!");
   process.exit(1);
 }
 
-// -----------------------------
-// 2️⃣ MongoDB Setup
-// -----------------------------
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
-// -----------------------------
-// 3️⃣ R2 Setup
-// -----------------------------
+// -------------------------------------------------
+// Cloudflare R2
+// -------------------------------------------------
 const s3Client = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
@@ -44,33 +38,35 @@ const s3Client = new S3Client({
 });
 
 function buildR2PublicUrl(fileName) {
-  return `${process.env.R2_PUBLIC_BASE_URL}${encodeURIComponent(fileName)}`;
+  let base = process.env.R2_PUBLIC_BASE_URL;
+  if (!base.endsWith("/")) base += "/";
+  return `${base}${encodeURIComponent(fileName)}`;
 }
 
-// -----------------------------
+// -------------------------------------------------
 // Recursive folder scan
-// -----------------------------
+// -------------------------------------------------
 function getAllImages(dir) {
+  const files = fs.readdirSync(dir);
   let results = [];
-  const list = fs.readdirSync(dir);
 
-  list.forEach(file => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
+  for (const file of files) {
+    const full = path.join(dir, file);
+    const stat = fs.statSync(full);
 
     if (stat.isDirectory()) {
-      results = results.concat(getAllImages(filePath));
+      results = results.concat(getAllImages(full));
     } else if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
-      results.push(filePath);
+      results.push(full);
     }
-  });
+  }
 
   return results;
 }
 
-// -----------------------------
+// -------------------------------------------------
 // 4️⃣ Upload All
-// -----------------------------
+// -------------------------------------------------
 async function uploadAll() {
   const files = getAllImages(FOLDER_PATH);
   if (files.length === 0) {
@@ -89,7 +85,7 @@ async function uploadAll() {
       const ext = path.extname(originalName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Upload main file
+      // Upload main image
       await s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
@@ -100,7 +96,7 @@ async function uploadAll() {
         })
       );
 
-      // Generate thumbnail
+      // Thumbnail
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
@@ -118,27 +114,31 @@ async function uploadAll() {
         })
       );
 
-      // SEO
+      // Generate SEO
       const seo = generateSEOFromFilename(originalName);
 
-      // Save to MongoDB (correct fields!)
+      // Save to MongoDB (FULL FIELDS)
       await Image.create({
         name: seo.title,
+        title: seo.title,
         fileName: uniqueName,
         thumbnailFileName: thumbName,
         url: buildR2PublicUrl(uniqueName),
+        thumbnailUrl: buildR2PublicUrl(thumbName),
         category: seo.category,
-        tags: seo.tags,
+        secondaryCategory: seo.secondaryCategory,
         description: seo.description,
-        altText: seo.alt,
-        uploadedAt: new Date(),
+        alt: seo.alt,
+        tags: seo.tags,
+        keywords: seo.keywords,
+        uploadedAt: new Date()
       });
 
       fs.unlinkSync(filePath);
       console.log(`✅ Uploaded: ${uniqueName}`);
 
     } catch (err) {
-      console.error(`❌ Upload failed: ${originalName}`, err.message);
+      console.error(`❌ Upload failed: ${originalName}`, err);
     }
   }
 
