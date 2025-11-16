@@ -87,7 +87,42 @@ async function getR2PresignedUrl(key, expiresSeconds = 3600) {
 
 const BULK_UPLOAD_FOLDER = path.join(__dirname, "image-to-upload");
 
-// Bulk Upload Function
+// ======================================================
+//  RETRY HELPER + ERROR LOGGING + MONGO FALLBACK
+// ======================================================
+async function retry(fn, attempts = 3, delay = 1200) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      console.log(`Retry ${i + 1} failed: ${err.message}`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+  throw lastError;
+}
+
+function writeFallbackLog(file, data) {
+  const dir = path.join(__dirname, "logs");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+  const filePath = path.join(dir, file);
+
+  let existing = [];
+  if (fs.existsSync(filePath)) {
+    existing = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  }
+
+  existing.push(data);
+
+  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
+}
+
+// ======================================================
+// UPDATED — BULK UPLOAD FUNCTION WITH RETRY + LOGGING
+// ======================================================
 async function uploadLocalFolderToR2() {
   if (!fs.existsSync(BULK_UPLOAD_FOLDER)) return;
 
@@ -103,52 +138,78 @@ async function uploadLocalFolderToR2() {
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
-          Key: fileName,
-          Body: buffer,
-          ContentType: contentType,
-          CacheControl: "public, max-age=31536000, immutable",
-        })
-      );
+      // Unique name to allow duplicates
+      const uniqueName = `${Date.now()}-${fileName}`;
 
+      // Upload original with retry
+      await retry(async () => {
+        return await s3Client.send(
+          new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: uniqueName,
+            Body: buffer,
+            ContentType: contentType,
+            CacheControl: "public, max-age=31536000, immutable",
+          })
+        );
+      });
+
+      // Create thumbnail
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
         .toBuffer();
 
-      const thumbName = `thumb_${fileName}`;
+      const thumbName = `thumb_${uniqueName}`;
 
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
-          Key: thumbName,
-          Body: thumbBuffer,
-          ContentType: "image/jpeg",
-          CacheControl: "public, max-age=31536000, immutable",
-        })
-      );
+      // Upload thumbnail with retry
+      await retry(async () => {
+        return await s3Client.send(
+          new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: thumbName,
+            Body: thumbBuffer,
+            ContentType: "image/jpeg",
+            CacheControl: "public, max-age=31536000, immutable",
+          })
+        );
+      });
 
       const seo = generateSEOFromFilename(fileName);
 
-      await Image.create({
-        name: seo.title,
-        fileName,
-        thumbnailFileName: thumbName,
-        url: buildR2PublicUrl(fileName),
-        category: seo.category,
-        tags: seo.tags,
-        description: seo.description,
-        altText: seo.alt,
-        uploadedAt: new Date(),
+      // Save metadata to MongoDB with retry + fallback if fails
+      await retry(async () => {
+        return await Image.create({
+          name: seo.title,
+          fileName: uniqueName,
+          thumbnailFileName: thumbName,
+          url: buildR2PublicUrl(uniqueName),
+          category: seo.category,
+          tags: seo.tags,
+          description: seo.description,
+          altText: seo.alt,
+          uploadedAt: new Date(),
+        });
+      }).catch(err => {
+        writeFallbackLog("mongo_fallback.json", {
+          file: uniqueName,
+          error: err.message,
+          time: new Date(),
+        });
+        throw err;
       });
 
       fs.unlinkSync(filePath);
-      console.log(`Uploaded: ${fileName}`);
+      console.log(`Uploaded: ${uniqueName}`);
 
     } catch (err) {
       console.error("Bulk Upload Error:", err.message);
+
+      writeFallbackLog("failed_uploads.json", {
+        file: fileName,
+        error: err.message,
+        time: new Date(),
+      });
     }
   }
 }
@@ -192,7 +253,8 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
     if (!format) return res.status(400).json({ message: "No format" });
 
     const valid = ["jpg", "jpeg", "png", "webp", "tiff", "pdf"];
-    if (!valid.includes(format)) return res.status(400).json({ message: "Invalid format" });
+    if (!valid.includes(format))
+      return res.status(400).json({ message: "Invalid format" });
 
     if (format === "pdf") {
       const pdfDoc = await PDFDocument.create();
@@ -224,7 +286,110 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
 });
 
 // ---------------------------
-// FINAL ROOT ROUTE (only one)
+// SINGLE IMAGE UPLOAD TO R2
+// ---------------------------
+app.post("/api/upload", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image uploaded" });
+    }
+
+    const originalName = req.file.originalname;
+    const buffer = req.file.buffer;
+
+    // Create unique filename
+    const uniqueName = `${Date.now()}-${originalName}`;
+
+    // Detect content type
+    const ext = path.extname(originalName).slice(1).toLowerCase();
+    const contentType = mime.getType(ext) || "application/octet-stream";
+
+    // ---- Upload to R2 with Retry ----
+    await retry(async () => {
+      return await s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: uniqueName,
+          Body: buffer,
+          ContentType: contentType,
+          CacheControl: "public, max-age=31536000, immutable",
+        })
+      );
+    });
+
+    // ---- Generate thumbnail ----
+    const thumbBuffer = await sharp(buffer)
+      .resize({ width: 400 })
+      .jpeg({ quality: 70 })
+      .toBuffer();
+
+    const thumbName = `thumb_${uniqueName}`;
+
+    // ---- Upload thumbnail with retry ----
+    await retry(async () => {
+      return await s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: thumbName,
+          Body: thumbBuffer,
+          ContentType: "image/jpeg",
+          CacheControl: "public, max-age=31536000, immutable",
+        })
+      );
+    });
+
+    // ---- SEO Generation ----
+    const seo = generateSEOFromFilename(originalName);
+
+    // ---- Save to MongoDB (retry + fallback) ----
+    await retry(async () => {
+      return await Image.create({
+        name: seo.title,
+        fileName: uniqueName,
+        thumbnailFileName: thumbName,
+        url: buildR2PublicUrl(uniqueName),
+        category: seo.category,
+        tags: seo.tags,
+        description: seo.description,
+        altText: seo.alt,
+        uploadedAt: new Date(),
+      });
+    }).catch(err => {
+      writeFallbackLog("mongo_fallback.json", {
+        file: uniqueName,
+        error: err.message,
+        time: new Date(),
+      });
+      throw err;
+    });
+
+    // SUCCESS RESPONSE
+    res.json({
+      success: true,
+      url: buildR2PublicUrl(uniqueName),
+      thumbnailUrl: buildR2PublicUrl(thumbName),
+    });
+
+  } catch (err) {
+    console.error("Single Upload Error:", err.message);
+
+    writeFallbackLog("failed_uploads.json", {
+      file: req.file?.originalname,
+      error: err.message,
+      time: new Date(),
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: "Upload failed",
+      error: err.message
+    });
+  }
+});
+
+
+// ---------------------------
+// FINAL ROOT ROUTE
 // ---------------------------
 app.get("/", (req, res) => {
   res.json({ status: "Pixeora API running" });
