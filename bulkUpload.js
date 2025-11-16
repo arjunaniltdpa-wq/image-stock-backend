@@ -1,14 +1,17 @@
-// bulkUpload.js
+// bulkUpload.js (FULL FIXED VERSION — MATCHES server.js)
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import mime from "mime";
+import sharp from "sharp";
 import {
   S3Client,
   PutObjectCommand
 } from "@aws-sdk/client-s3";
+
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
+import Image from "./models/Image.js";
 
 dotenv.config();
 
@@ -26,42 +29,26 @@ if (!fs.existsSync(FOLDER_PATH)) {
 // -----------------------------
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ MongoDB connection error:", err));
-
-const imageSchema = new mongoose.Schema({
-  name: String,       // SEO-friendly name
-  fileName: String,   // original file name
-  url: String,
-  category: String,
-  title: String,
-  description: String,
-  alt: String,
-  tags: [String],
-  uploadedAt: { type: Date, default: Date.now },
-});
-
-const Image = mongoose.model("Image", imageSchema, "images");
+  .catch(err => console.error("❌ MongoDB error:", err));
 
 // -----------------------------
-// 3️⃣ Cloudflare R2 Setup (S3 Compatible)
+// 3️⃣ R2 Setup
 // -----------------------------
 const s3Client = new S3Client({
   region: "auto",
-  endpoint: process.env.R2_ENDPOINT, // from .env
+  endpoint: process.env.R2_ENDPOINT,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
-  },
-  forcePathStyle: false
+  }
 });
 
-// fix public URL helper
 function buildR2PublicUrl(fileName) {
   return `${process.env.R2_PUBLIC_BASE_URL}${encodeURIComponent(fileName)}`;
 }
 
 // -----------------------------
-// 4️⃣ Deep-Scan Folder Function
+// Recursive folder scan
 // -----------------------------
 function getAllImages(dir) {
   let results = [];
@@ -72,7 +59,7 @@ function getAllImages(dir) {
     const stat = fs.statSync(filePath);
 
     if (stat.isDirectory()) {
-      results = results.concat(getAllImages(filePath)); // recursive
+      results = results.concat(getAllImages(filePath));
     } else if (/\.(jpg|jpeg|png|webp)$/i.test(file)) {
       results.push(filePath);
     }
@@ -82,66 +69,81 @@ function getAllImages(dir) {
 }
 
 // -----------------------------
-// 5️⃣ Upload Function
+// 4️⃣ Upload All
 // -----------------------------
 async function uploadAll() {
   const files = getAllImages(FOLDER_PATH);
   if (files.length === 0) {
-    console.log("No images to upload!");
-    return;
+    console.log("No images to upload");
+    process.exit(0);
   }
 
   console.log(`🖼️ Found ${files.length} images.`);
 
   for (const filePath of files) {
-    const fileName = path.basename(filePath);
+    const originalName = path.basename(filePath);
+    const uniqueName = `${Date.now()}-${originalName}`;
 
     try {
-      const fileBuffer = fs.readFileSync(filePath);
-      const ext = path.extname(fileName).slice(1);
+      const buffer = fs.readFileSync(filePath);
+      const ext = path.extname(originalName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Upload to R2
+      // Upload main file
       await s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
-          Key: fileName,
-          Body: fileBuffer,
+          Key: uniqueName,
+          Body: buffer,
           ContentType: contentType,
           CacheControl: "public, max-age=31536000, immutable"
         })
       );
 
-      // SEO generation
-      const seo = generateSEOFromFilename(fileName);
+      // Generate thumbnail
+      const thumbBuffer = await sharp(buffer)
+        .resize({ width: 400 })
+        .jpeg({ quality: 70 })
+        .toBuffer();
 
+      const thumbName = `thumb_${uniqueName}`;
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: thumbName,
+          Body: thumbBuffer,
+          ContentType: "image/jpeg",
+          CacheControl: "public, max-age=31536000, immutable"
+        })
+      );
+
+      // SEO
+      const seo = generateSEOFromFilename(originalName);
+
+      // Save to MongoDB (correct fields!)
       await Image.create({
-        name: fileName.toLowerCase().replace(/\s+/g, "-"),
-        fileName: fileName,
-        url: buildR2PublicUrl(fileName),
+        name: seo.title,
+        fileName: uniqueName,
+        thumbnailFileName: thumbName,
+        url: buildR2PublicUrl(uniqueName),
         category: seo.category,
-        title: seo.title,
-        description: seo.description,
-        alt: seo.alt,
         tags: seo.tags,
-        uploadedAt: new Date()
+        description: seo.description,
+        altText: seo.alt,
+        uploadedAt: new Date(),
       });
 
-      // remove local file
       fs.unlinkSync(filePath);
-
-      console.log(`✅ Uploaded & SEO saved: ${fileName}`);
+      console.log(`✅ Uploaded: ${uniqueName}`);
 
     } catch (err) {
-      console.error(`❌ Failed: ${fileName}`, err.message);
+      console.error(`❌ Upload failed: ${originalName}`, err.message);
     }
   }
 
-  console.log("🎉 All images uploaded to R2 successfully!");
+  console.log("🎉 Bulk upload complete!");
   process.exit(0);
 }
 
-// -----------------------------
-// 6️⃣ RUN
-// -----------------------------
 uploadAll();
