@@ -9,12 +9,14 @@ router.get("/", async (req, res) => {
     const q = req.query.q?.trim();
     if (!q) return res.json([]);
 
+    const finalResults = [];
+
     /* --------------------------------------------------------
-     * 1. EXACT MATCH (highest priority)
+     * 1. EXACT MATCH (Highest priority)
      * -------------------------------------------------------- */
     const exactRegex = new RegExp(`\\b${q}\\b`, "i");
 
-    const exactResults = await Image.find({
+    const exact = await Image.find({
       $or: [
         { title: exactRegex },
         { name: exactRegex },
@@ -22,46 +24,79 @@ router.get("/", async (req, res) => {
         { category: exactRegex },
         { secondaryCategory: exactRegex },
         { alt: exactRegex },
-        { tags: { $regex: exactRegex } },
-        { keywords: { $regex: exactRegex } }
+        { tags: exactRegex },
+        { keywords: exactRegex }
       ]
     }).limit(150);
 
 
     /* --------------------------------------------------------
-     * 2. RELATED MATCH (using full-text search)
-     *    MongoDB will find related words like:
-     *    travel, vehicle, transport, city, road, traffic
+     * 2. FULL TEXT SEARCH (Related results like Unsplash)
      * -------------------------------------------------------- */
-    let relatedResults = [];
-
+    let textSearch = [];
     try {
-      relatedResults = await Image.find(
+      textSearch = await Image.find(
         { $text: { $search: q } },
         { score: { $meta: "textScore" } }
       )
         .sort({ score: { $meta: "textScore" } })
         .limit(200);
-    } catch (err) {
-      console.warn("Text search not enabled.");
+    } catch {
+      console.warn("Text search index not created.");
     }
 
 
     /* --------------------------------------------------------
-     * 3. MERGE RESULTS (remove duplicates)
+     * 3. PREFIX SEARCH (flo → flower, floral, floor)
      * -------------------------------------------------------- */
-    const merged = [...exactResults];
+    const prefixRegex = new RegExp(`^${q}`, "i");
 
-    for (const img of relatedResults) {
-      if (!merged.find(x => x._id.toString() === img._id.toString())) {
-        merged.push(img);
+    const prefix = await Image.find({
+      $or: [
+        { title: prefixRegex },
+        { name: prefixRegex },
+        { tags: prefixRegex },
+        { keywords: prefixRegex }
+      ]
+    }).limit(120);
+
+
+    /* --------------------------------------------------------
+     * 4. FUZZY SEARCH (flwer → flower)
+     * -------------------------------------------------------- */
+    const fuzzyRegex = new RegExp(q.split("").join(".*"), "i");
+
+    const fuzzy = await Image.find({
+      $or: [
+        { title: fuzzyRegex },
+        { name: fuzzyRegex },
+        { tags: fuzzyRegex },
+        { keywords: fuzzyRegex }
+      ]
+    }).limit(120);
+
+
+    /* --------------------------------------------------------
+     * 5. MERGE ALL RESULTS WITHOUT DUPLICATES
+     * -------------------------------------------------------- */
+    const pushUnique = arr => {
+      for (const img of arr) {
+        if (!finalResults.find(x => x._id.toString() === img._id.toString())) {
+          finalResults.push(img);
+        }
       }
-    }
+    };
+
+    pushUnique(exact);      // exact match first priority
+    pushUnique(textSearch); // related results
+    pushUnique(prefix);     // prefix based
+    pushUnique(fuzzy);      // spelling correction
+
 
     /* --------------------------------------------------------
-     * 4. LIMIT FINAL OUTPUT
+     * 6. LIMIT & RETURN
      * -------------------------------------------------------- */
-    res.json(merged.slice(0, 250));
+    res.json(finalResults.slice(0, 300));
 
   } catch (err) {
     console.error("Search error:", err.message);
