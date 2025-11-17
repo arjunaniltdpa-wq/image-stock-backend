@@ -9,27 +9,59 @@ router.get("/", async (req, res) => {
     const q = req.query.q?.trim();
     if (!q) return res.json([]);
 
-    const regex = new RegExp(q, "i");
+    /* --------------------------------------------------------
+     * 1. EXACT MATCH (highest priority)
+     * -------------------------------------------------------- */
+    const exactRegex = new RegExp(`\\b${q}\\b`, "i");
 
-    const results = await Image.find({
+    const exactResults = await Image.find({
       $or: [
-        { title: regex },
-        { name: regex },
-        { description: regex },
-        { category: regex },
-        { secondaryCategory: regex },
-        { fileName: regex },
-        { alt: regex },
-
-        // ⭐ Correct array searching
-        { tags: { $elemMatch: { $regex: regex } } },
-        { keywords: { $elemMatch: { $regex: regex } } }
+        { title: exactRegex },
+        { name: exactRegex },
+        { description: exactRegex },
+        { category: exactRegex },
+        { secondaryCategory: exactRegex },
+        { alt: exactRegex },
+        { tags: { $regex: exactRegex } },
+        { keywords: { $regex: exactRegex } }
       ]
-    })
-      .limit(200)
-      .sort({ uploadedAt: -1 });
+    }).limit(150);
 
-    res.json(results);
+
+    /* --------------------------------------------------------
+     * 2. RELATED MATCH (using full-text search)
+     *    MongoDB will find related words like:
+     *    travel, vehicle, transport, city, road, traffic
+     * -------------------------------------------------------- */
+    let relatedResults = [];
+
+    try {
+      relatedResults = await Image.find(
+        { $text: { $search: q } },
+        { score: { $meta: "textScore" } }
+      )
+        .sort({ score: { $meta: "textScore" } })
+        .limit(200);
+    } catch (err) {
+      console.warn("Text search not enabled.");
+    }
+
+
+    /* --------------------------------------------------------
+     * 3. MERGE RESULTS (remove duplicates)
+     * -------------------------------------------------------- */
+    const merged = [...exactResults];
+
+    for (const img of relatedResults) {
+      if (!merged.find(x => x._id.toString() === img._id.toString())) {
+        merged.push(img);
+      }
+    }
+
+    /* --------------------------------------------------------
+     * 4. LIMIT FINAL OUTPUT
+     * -------------------------------------------------------- */
+    res.json(merged.slice(0, 250));
 
   } catch (err) {
     console.error("Search error:", err.message);
