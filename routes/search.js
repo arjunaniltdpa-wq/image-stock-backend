@@ -9,10 +9,10 @@ router.get("/", async (req, res) => {
     const q = req.query.q?.trim();
     if (!q) return res.json([]);
 
-    const finalResults = [];
+    const results = [];
 
     /* --------------------------------------------------------
-     * 1. EXACT MATCH (Highest priority)
+     * EXACT MATCH
      * -------------------------------------------------------- */
     const exactRegex = new RegExp(`\\b${q}\\b`, "i");
 
@@ -31,23 +31,7 @@ router.get("/", async (req, res) => {
 
 
     /* --------------------------------------------------------
-     * 2. FULL TEXT SEARCH (Related results like Unsplash)
-     * -------------------------------------------------------- */
-    let textSearch = [];
-    try {
-      textSearch = await Image.find(
-        { $text: { $search: q } },
-        { score: { $meta: "textScore" } }
-      )
-        .sort({ score: { $meta: "textScore" } })
-        .limit(200);
-    } catch {
-      console.warn("Text search index not created.");
-    }
-
-
-    /* --------------------------------------------------------
-     * 3. PREFIX SEARCH (flo → flower, floral, floor)
+     * PREFIX MATCH  (flo → flower, floor)
      * -------------------------------------------------------- */
     const prefixRegex = new RegExp(`^${q}`, "i");
 
@@ -58,11 +42,11 @@ router.get("/", async (req, res) => {
         { tags: prefixRegex },
         { keywords: prefixRegex }
       ]
-    }).limit(120);
+    }).limit(150);
 
 
     /* --------------------------------------------------------
-     * 4. FUZZY SEARCH (flwer → flower)
+     * FUZZY MATCH  (flwer → flower)
      * -------------------------------------------------------- */
     const fuzzyRegex = new RegExp(q.split("").join(".*"), "i");
 
@@ -73,30 +57,25 @@ router.get("/", async (req, res) => {
         { tags: fuzzyRegex },
         { keywords: fuzzyRegex }
       ]
-    }).limit(120);
+    }).limit(150);
 
 
     /* --------------------------------------------------------
-     * 5. MERGE ALL RESULTS WITHOUT DUPLICATES
+     * MERGE (NO DUPLICATES)
      * -------------------------------------------------------- */
-    const pushUnique = arr => {
-      for (const img of arr) {
-        if (!finalResults.find(x => x._id.toString() === img._id.toString())) {
-          finalResults.push(img);
+    const addUnique = arr => {
+      for (const i of arr) {
+        if (!results.find(x => x._id.toString() === i._id.toString())) {
+          results.push(i);
         }
       }
     };
 
-    pushUnique(exact);      // exact match first priority
-    pushUnique(textSearch); // related results
-    pushUnique(prefix);     // prefix based
-    pushUnique(fuzzy);      // spelling correction
+    addUnique(exact);
+    addUnique(prefix);
+    addUnique(fuzzy);
 
-
-    /* --------------------------------------------------------
-     * 6. LIMIT & RETURN
-     * -------------------------------------------------------- */
-    res.json(finalResults.slice(0, 300));
+    res.json(results.slice(0, 300));
 
   } catch (err) {
     console.error("Search error:", err.message);
