@@ -61,7 +61,6 @@ mongoose.connect(process.env.MONGO_URI, {})
 // API ROUTES
 // ---------------------------
 app.use("/api/images", imageRoutes);
-app.use("/api/download", downloadRoute);
 
 
 // ---------------------------
