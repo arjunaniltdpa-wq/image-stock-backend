@@ -4,6 +4,30 @@ import Image from "../models/Image.js";
 
 const router = express.Router();
 
+/* ----------------------------------------------
+   Generate variations like:
+   car → car, cars
+   cars → car, cars
+   flower → flower, flowers
+   flowers → flower, flowers
+-----------------------------------------------*/
+function getWordForms(q) {
+  const forms = new Set();
+  forms.add(q);
+
+  // plural → singular (cars → car)
+  if (q.endsWith("s")) {
+    forms.add(q.slice(0, -1));
+  }
+
+  // singular → plural (car → cars)
+  if (!q.endsWith("s")) {
+    forms.add(q + "s");
+  }
+
+  return Array.from(forms);
+}
+
 router.get("/", async (req, res) => {
   try {
     const q = req.query.q?.trim();
@@ -11,35 +35,46 @@ router.get("/", async (req, res) => {
 
     const results = [];
 
-    /*Exact match*/
-    const exactRegex = new RegExp(`\\b${q}\\b`, "i");
+    const forms = getWordForms(q); 
+    // Example: "cars" → ["cars", "car"]
 
+    /* ----------------------------------------------------
+       Build regex arrays for exact and prefix search
+    ---------------------------------------------------- */
+    const exactRegexArray = forms.map(word => new RegExp(`\\b${word}\\b`, "i"));
+    const prefixRegexArray = forms.map(word => new RegExp(`^${word}`, "i"));
+
+    /* ----------------------------------------------------
+       Exact matches (highest priority)
+    ---------------------------------------------------- */
     const exact = await Image.find({
       $or: [
-        { title: exactRegex },
-        { name: exactRegex },
-        { description: exactRegex },
-        { category: exactRegex },
-        { secondaryCategory: exactRegex },
-        { alt: exactRegex },
-        { tags: exactRegex },
-        { keywords: exactRegex }
+        ...exactRegexArray.map(r => ({ title: r })),
+        ...exactRegexArray.map(r => ({ name: r })),
+        ...exactRegexArray.map(r => ({ description: r })),
+        ...exactRegexArray.map(r => ({ category: r })),
+        ...exactRegexArray.map(r => ({ secondaryCategory: r })),
+        ...exactRegexArray.map(r => ({ alt: r })),
+        ...exactRegexArray.map(r => ({ tags: r })),
+        ...exactRegexArray.map(r => ({ keywords: r }))
       ]
     }).limit(150);
 
-    /*Prefix match ("bus" → bus, bus-stop, bus-road)*/
-    const prefixRegex = new RegExp(`^${q}`, "i");
-
+    /* ----------------------------------------------------
+       Prefix matches (car → car-road, car-image)
+    ---------------------------------------------------- */
     const prefix = await Image.find({
       $or: [
-        { title: prefixRegex },
-        { name: prefixRegex },
-        { tags: prefixRegex },
-        { keywords: prefixRegex }
+        ...prefixRegexArray.map(r => ({ title: r })),
+        ...prefixRegexArray.map(r => ({ name: r })),
+        ...prefixRegexArray.map(r => ({ tags: r })),
+        ...prefixRegexArray.map(r => ({ keywords: r }))
       ]
     }).limit(150);
 
-    /*Merge results*/
+    /* ----------------------------------------------------
+       Merge without duplicates
+    ---------------------------------------------------- */
     const addUnique = arr => {
       arr.forEach(i => {
         if (!results.find(x => x._id.toString() === i._id.toString())) {
