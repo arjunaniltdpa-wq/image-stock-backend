@@ -11,9 +11,7 @@ router.get("/", async (req, res) => {
 
     const results = [];
 
-    /* --------------------------------------------------------
-     * EXACT MATCH
-     * -------------------------------------------------------- */
+    /*Exact match*/
     const exactRegex = new RegExp(`\\b${q}\\b`, "i");
 
     const exact = await Image.find({
@@ -29,10 +27,7 @@ router.get("/", async (req, res) => {
       ]
     }).limit(150);
 
-
-    /* --------------------------------------------------------
-     * PREFIX MATCH  (flo → flower, floor)
-     * -------------------------------------------------------- */
+    /*Prefix match ("bus" → bus, bus-stop, bus-road)*/
     const prefixRegex = new RegExp(`^${q}`, "i");
 
     const prefix = await Image.find({
@@ -44,38 +39,19 @@ router.get("/", async (req, res) => {
       ]
     }).limit(150);
 
-
-    /* --------------------------------------------------------
-     * FUZZY MATCH  (flwer → flower)
-     * -------------------------------------------------------- */
-    const fuzzyRegex = new RegExp(q.split("").join(".*"), "i");
-
-    const fuzzy = await Image.find({
-      $or: [
-        { title: fuzzyRegex },
-        { name: fuzzyRegex },
-        { tags: fuzzyRegex },
-        { keywords: fuzzyRegex }
-      ]
-    }).limit(150);
-
-
-    /* --------------------------------------------------------
-     * MERGE (NO DUPLICATES)
-     * -------------------------------------------------------- */
+    /*Merge results*/
     const addUnique = arr => {
-      for (const i of arr) {
+      arr.forEach(i => {
         if (!results.find(x => x._id.toString() === i._id.toString())) {
           results.push(i);
         }
-      }
+      });
     };
 
     addUnique(exact);
     addUnique(prefix);
-    addUnique(fuzzy);
 
-    res.json(results.slice(0, 300));
+    res.json(results.slice(0, 200));
 
   } catch (err) {
     console.error("Search error:", err.message);
