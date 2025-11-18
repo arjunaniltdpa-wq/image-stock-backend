@@ -62,6 +62,10 @@ mongoose.connect(process.env.MONGO_URI, {})
 // ---------------------------
 app.use("/api/images", imageRoutes);
 
+import removeBg from "./routes/removeBg.js";
+app.use("/api/remove-bg", removeBg);
+
+
 
 // ---------------------------
 // Cloudflare R2 SETUP
