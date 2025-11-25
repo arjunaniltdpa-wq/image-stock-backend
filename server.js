@@ -85,6 +85,7 @@ const s3Client = new S3Client({
 import sitemapRoute from "./sitemap.js";
 app.use("/", sitemapRoute);
 
+
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain");
   res.sendFile(path.join(__dirname, "robots.txt"));
