@@ -44,6 +44,8 @@ function buildR2PublicUrl(fileName) {
 -------------------------------------------- */
 const upload = multer({ storage: multer.memoryStorage() });
 
+
+
 /* --------------------------------------------
    UPLOAD ROUTE
 -------------------------------------------- */
@@ -306,5 +308,27 @@ router.get("/file/:name", async (req, res) => {
     res.status(404).json({ error: "File not found" });
   }
 });
+
+/* --------------------------------------------
+   GET IMAGE BY SLUG + ID  (SEO Friendly URL)
+-------------------------------------------- */
+router.get("/slug/:slugAndId", async (req, res) => {
+  try {
+    const raw = req.params.slugAndId;
+
+    // Extract slug (everything except last "-objectId")
+    const slug = raw.split("-").slice(0, -1).join("-");
+
+    const img = await Image.findOne({ slug });
+
+    if (!img) return res.status(404).json({ error: "Not found" });
+
+    res.json(img);
+  } catch (err) {
+    console.error("Slug fetch error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 export default router;

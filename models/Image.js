@@ -1,4 +1,3 @@
-// models/Image.js
 import mongoose from "mongoose";
 
 const imageSchema = new mongoose.Schema({
@@ -12,26 +11,39 @@ const imageSchema = new mongoose.Schema({
   secondaryCategory: String,
   description: String,
   alt: String,
-  tags: { type: [String], default: [] },
-  keywords: { type: [String], default: [] },
 
-  // ⭐ SEO slug (clean URL)
+  tags: { 
+    type: [String], 
+    default: [] 
+  },
+
+  keywords: { 
+    type: [String], 
+    default: [] 
+  },
+
+  // ⭐ SEO-friendly slug for clean URLs
   slug: {
     type: String,
     required: true,
     index: true,
-    unique: false, // we allow duplicates because slug ends with ID
-    lowercase: true, // ⭐ ensures consistent URLs
+    unique: false,      // duplicates allowed because ID makes final URL unique
+    lowercase: true,    // auto convert to lowercase
     trim: true
   },
 
-  uploadedAt: { type: Date, default: Date.now }
+  uploadedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
+
 }, { versionKey: false });
 
-// ⭐ Ensure slug is always lowercase before saving
+
+// ⭐ Automatically ensure slug is lowercase before saving
 imageSchema.pre("save", function (next) {
   if (this.slug) {
-    this.slug = this.slug.toLowerCase();
+    this.slug = this.slug.toLowerCase().trim();
   }
   next();
 });

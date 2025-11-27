@@ -28,7 +28,7 @@ mongoose.connect(process.env.MONGO_URI)
 // -------------------------------------------------
 // Cloudflare R2
 // -------------------------------------------------
-const s3Client = new S3Client({
+const s2Client = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
   credentials: {
@@ -41,18 +41,6 @@ function buildR2PublicUrl(fileName) {
   let base = process.env.R2_PUBLIC_BASE_URL;
   if (!base.endsWith("/")) base += "/";
   return `${base}${encodeURIComponent(fileName)}`;
-}
-
-// -------------------------------------------------
-// ⭐ Add slug generator
-// -------------------------------------------------
-function generateSlug(str) {
-  return str
-    .toLowerCase()
-    .replace(/\.[^/.]+$/, "")        // remove extension
-    .replace(/[^a-z0-9]+/g, "-")     // replace spaces/symbols with -
-    .replace(/--+/g, "-")            // remove multiple hyphens
-    .replace(/^-+|-+$/g, "");        // trim hyphens
 }
 
 // -------------------------------------------------
@@ -98,7 +86,7 @@ async function uploadAll() {
       const contentType = mime.getType(ext) || "application/octet-stream";
 
       // Upload main image
-      await s3Client.send(
+      await s2Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: uniqueName,
@@ -116,7 +104,7 @@ async function uploadAll() {
 
       const thumbName = `thumb_${uniqueName}`;
 
-      await s3Client.send(
+      await s2Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: thumbName,
@@ -126,11 +114,8 @@ async function uploadAll() {
         })
       );
 
-      // Generate SEO
+      // Generate SEO (includes slug)
       const seo = generateSEOFromFilename(originalName);
-
-      // ⭐ Generate slug
-      const slug = generateSlug(originalName);
 
       // Save to MongoDB (FULL FIELDS + SLUG)
       await Image.create({
@@ -146,7 +131,7 @@ async function uploadAll() {
         alt: seo.alt,
         tags: seo.tags,
         keywords: seo.keywords,
-        slug: seo.slug,                                // ⭐ ADDED
+        slug: seo.slug,                        // ⭐ CORRECT SLUG
         uploadedAt: new Date()
       });
 
