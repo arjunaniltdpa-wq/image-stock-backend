@@ -44,6 +44,18 @@ function buildR2PublicUrl(fileName) {
 }
 
 // -------------------------------------------------
+// ⭐ Add slug generator
+// -------------------------------------------------
+function generateSlug(str) {
+  return str
+    .toLowerCase()
+    .replace(/\.[^/.]+$/, "")        // remove extension
+    .replace(/[^a-z0-9]+/g, "-")     // replace spaces/symbols with -
+    .replace(/--+/g, "-")            // remove multiple hyphens
+    .replace(/^-+|-+$/g, "");        // trim hyphens
+}
+
+// -------------------------------------------------
 // Recursive folder scan
 // -------------------------------------------------
 function getAllImages(dir) {
@@ -117,7 +129,10 @@ async function uploadAll() {
       // Generate SEO
       const seo = generateSEOFromFilename(originalName);
 
-      // Save to MongoDB (FULL FIELDS)
+      // ⭐ Generate slug
+      const slug = generateSlug(originalName);
+
+      // Save to MongoDB (FULL FIELDS + SLUG)
       await Image.create({
         name: seo.title,
         title: seo.title,
@@ -131,6 +146,7 @@ async function uploadAll() {
         alt: seo.alt,
         tags: seo.tags,
         keywords: seo.keywords,
+        slug,                                   // ⭐ ADDED
         uploadedAt: new Date()
       });
 

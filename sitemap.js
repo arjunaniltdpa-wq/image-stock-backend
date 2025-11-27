@@ -6,8 +6,9 @@ const router = express.Router();
 // ------------------------
 // CONFIG
 // ------------------------
-const DOMAIN = "https://pixeora.com";   // your website URL
-const IMAGES_PER_SITEMAP = 5000;        // Google max limit
+const SITE = "https://pixeora.com";       // frontend URL
+const CDN = "https://cdn.pixeora.com";    // cdn for images
+const IMAGES_PER_SITEMAP = 5000;
 
 // ------------------------
 // SITEMAP INDEX
@@ -18,22 +19,12 @@ router.get("/sitemap.xml", async (req, res) => {
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
   <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  
-    <sitemap>
-      <loc>${DOMAIN}/sitemap-static.xml</loc>
-    </sitemap>
-
-    <sitemap>
-      <loc>${DOMAIN}/sitemap-tools.xml</loc>
-    </sitemap>
+    <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
+    <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
   `;
 
   for (let i = 1; i <= pages; i++) {
-    xml += `
-      <sitemap>
-        <loc>${DOMAIN}/sitemap-images-${i}.xml</loc>
-      </sitemap>
-    `;
+    xml += `<sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>`;
   }
 
   xml += `</sitemapindex>`;
@@ -46,11 +37,7 @@ router.get("/sitemap.xml", async (req, res) => {
 // STATIC PAGES
 // ------------------------
 router.get("/sitemap-static.xml", (req, res) => {
-  const urls = [
-    "/",
-    "/legal.html",
-    "/search.html"
-  ];
+  const urls = ["/", "/legal.html", "/search.html"];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -59,7 +46,7 @@ router.get("/sitemap-static.xml", (req, res) => {
   urls.forEach(url => {
     xml += `
       <url>
-        <loc>${DOMAIN}${url}</loc>
+        <loc>${SITE}${url}</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
       </url>`;
@@ -89,7 +76,7 @@ router.get("/sitemap-tools.xml", (req, res) => {
   tools.forEach(tool => {
     xml += `
       <url>
-        <loc>${DOMAIN}${tool}</loc>
+        <loc>${SITE}${tool}</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
       </url>`;
@@ -102,7 +89,7 @@ router.get("/sitemap-tools.xml", (req, res) => {
 });
 
 // ------------------------
-// IMAGES – PAGINATED
+// IMAGE SITEMAPS (Paginated)
 // ------------------------
 router.get("/sitemap-images-:page.xml", async (req, res) => {
   const page = parseInt(req.params.page) || 1;
@@ -112,15 +99,25 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
     .limit(IMAGES_PER_SITEMAP);
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
-  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <urlset 
+    xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+    xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+  >
   `;
 
   images.forEach(img => {
+    const fileToShow = img.thumbnailFileName || img.fileName;
     xml += `
       <url>
-        <loc>${DOMAIN}/download.html?id=${img._id}</loc>
+        <loc>${SITE}/download.html?id=${img._id}</loc>
         <changefreq>monthly</changefreq>
         <priority>0.6</priority>
+
+        <image:image>
+          <image:loc>${CDN}/${fileToShow}</image:loc>
+          <image:title>${img.name || "Image"}</image:title>
+        </image:image>
+
       </url>`;
   });
 

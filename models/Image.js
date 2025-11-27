@@ -14,6 +14,13 @@ const imageSchema = new mongoose.Schema({
   alt: String,                  // alt text
   tags: { type: [String], default: [] },     // short tags
   keywords: { type: [String], default: [] }, // meta keywords (longer)
+   // ⭐ Add this new field
+  slug: {
+    type: String,
+    required: false,
+    index: true
+  },
+  
   uploadedAt: { type: Date, default: Date.now }
 }, { versionKey: false });
 
