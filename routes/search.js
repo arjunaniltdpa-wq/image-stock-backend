@@ -1,30 +1,24 @@
 // routes/search.js
 import express from "express";
 import Image from "../models/Image.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const router = express.Router();
 
-/* ----------------------------------------------
-   Generate variations like:
-   car → car, cars
-   cars → car, cars
-   flower → flower, flowers
-   flowers → flower, flowers
------------------------------------------------*/
+/* Cloudflare R2 public URL builder */
+const buildR2 = (file) => {
+  let base = process.env.R2_PUBLIC_BASE_URL || "";
+  if (!base.endsWith("/")) base += "/";
+  return base + encodeURIComponent(file);
+};
+
+/* Word forms */
 function getWordForms(q) {
   const forms = new Set();
   forms.add(q);
-
-  // plural → singular (cars → car)
-  if (q.endsWith("s")) {
-    forms.add(q.slice(0, -1));
-  }
-
-  // singular → plural (car → cars)
-  if (!q.endsWith("s")) {
-    forms.add(q + "s");
-  }
-
+  if (q.endsWith("s")) forms.add(q.slice(0, -1));
+  if (!q.endsWith("s")) forms.add(q + "s");
   return Array.from(forms);
 }
 
@@ -34,19 +28,12 @@ router.get("/", async (req, res) => {
     if (!q) return res.json([]);
 
     const results = [];
+    const forms = getWordForms(q);
 
-    const forms = getWordForms(q); 
-    // Example: "cars" → ["cars", "car"]
+    const exactRegexArray = forms.map(w => new RegExp(`\\b${w}\\b`, "i"));
+    const prefixRegexArray = forms.map(w => new RegExp(`^${w}`, "i"));
 
-    /* ----------------------------------------------------
-       Build regex arrays for exact and prefix search
-    ---------------------------------------------------- */
-    const exactRegexArray = forms.map(word => new RegExp(`\\b${word}\\b`, "i"));
-    const prefixRegexArray = forms.map(word => new RegExp(`^${word}`, "i"));
-
-    /* ----------------------------------------------------
-       Exact matches (highest priority)
-    ---------------------------------------------------- */
+    /* Exact matches (fast, .lean() for performance) */
     const exact = await Image.find({
       $or: [
         ...exactRegexArray.map(r => ({ title: r })),
@@ -58,11 +45,8 @@ router.get("/", async (req, res) => {
         ...exactRegexArray.map(r => ({ tags: r })),
         ...exactRegexArray.map(r => ({ keywords: r }))
       ]
-    }).limit(150);
+    }).lean().limit(150);
 
-    /* ----------------------------------------------------
-       Prefix matches (car → car-road, car-image)
-    ---------------------------------------------------- */
     const prefix = await Image.find({
       $or: [
         ...prefixRegexArray.map(r => ({ title: r })),
@@ -70,15 +54,13 @@ router.get("/", async (req, res) => {
         ...prefixRegexArray.map(r => ({ tags: r })),
         ...prefixRegexArray.map(r => ({ keywords: r }))
       ]
-    }).limit(150);
+    }).lean().limit(150);
 
-    /* ----------------------------------------------------
-       Merge without duplicates
-    ---------------------------------------------------- */
-    const addUnique = arr => {
-      arr.forEach(i => {
-        if (!results.find(x => x._id.toString() === i._id.toString())) {
-          results.push(i);
+    /* Merge without duplicates */
+    const addUnique = (arr) => {
+      arr.forEach(img => {
+        if (!results.find(x => x._id.toString() === img._id.toString())) {
+          results.push(img);
         }
       });
     };
@@ -86,7 +68,21 @@ router.get("/", async (req, res) => {
     addUnique(exact);
     addUnique(prefix);
 
-    res.json(results.slice(0, 200));
+    /* 🔥 AUTO-FIX: Ensure every image has thumbnail + URL */
+    const final = results.slice(0, 200).map(img => {
+
+      // If old images have no thumb, auto-generate the filename
+      if (!img.thumbnailFileName) {
+        img.thumbnailFileName = `thumb_${img.fileName}`;
+      }
+
+      img.thumbnailUrl = buildR2(img.thumbnailFileName);
+      img.fileUrl = buildR2(img.fileName);
+
+      return img;
+    });
+
+    return res.json(final);
 
   } catch (err) {
     console.error("Search error:", err.message);
