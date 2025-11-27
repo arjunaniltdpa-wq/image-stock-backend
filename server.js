@@ -91,6 +91,9 @@ app.get("/robots.txt", (req, res) => {
   res.sendFile(path.join(__dirname, "robots.txt"));
 });
 
+app.get("/photo/:slug", (req, res) => {
+  res.sendFile("download.html", { root: "./public" });
+});
 
 
 // Build public R2 URL

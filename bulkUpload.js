@@ -146,7 +146,7 @@ async function uploadAll() {
         alt: seo.alt,
         tags: seo.tags,
         keywords: seo.keywords,
-        slug,                                   // ⭐ ADDED
+        slug: seo.slug,                                // ⭐ ADDED
         uploadedAt: new Date()
       });
 

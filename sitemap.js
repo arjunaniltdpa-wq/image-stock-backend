@@ -89,7 +89,7 @@ router.get("/sitemap-tools.xml", (req, res) => {
 });
 
 // ------------------------
-// IMAGE SITEMAPS (Paginated)
+// IMAGE SITEMAPS (Paginated) — UPDATED TO CLEAN URLS
 // ------------------------
 router.get("/sitemap-images-:page.xml", async (req, res) => {
   const page = parseInt(req.params.page) || 1;
@@ -106,16 +106,19 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
   `;
 
   images.forEach(img => {
+    const cleanUrl = `${SITE}/photo/${img.slug}-${img._id}`;
     const fileToShow = img.thumbnailFileName || img.fileName;
+
     xml += `
       <url>
-        <loc>${SITE}/download.html?id=${img._id}</loc>
+        <loc>${cleanUrl}</loc>
         <changefreq>monthly</changefreq>
-        <priority>0.6</priority>
+        <priority>0.9</priority>
 
         <image:image>
-          <image:loc>${CDN}/${fileToShow}</image:loc>
-          <image:title>${img.name || "Image"}</image:title>
+          <image:loc>${CDN}/${encodeURIComponent(fileToShow)}</image:loc>
+          <image:title>${img.title || img.name || "Free HD Image"}</image:title>
+          <image:caption>${img.description || img.title}</image:caption>
         </image:image>
 
       </url>`;
