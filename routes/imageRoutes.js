@@ -310,22 +310,23 @@ router.get("/file/:name", async (req, res) => {
 });
 
 /* --------------------------------------------
-   GET IMAGE BY SLUG + ID  (SEO Friendly URL)
+   GET IMAGE BY SLUG + ID  (Correct version)
 -------------------------------------------- */
 router.get("/slug/:slugAndId", async (req, res) => {
   try {
     const raw = req.params.slugAndId;
 
-    // Extract slug (everything except last "-objectId")
-    const slug = raw.split("-").slice(0, -1).join("-");
+    // ID = last part after last "-"
+    const id = raw.split("-").pop();
 
-    const img = await Image.findOne({ slug });
+    // Fetch using ID (100% accurate)
+    const img = await Image.findById(id);
 
-    if (!img) return res.status(404).json({ error: "Not found" });
+    if (!img) return res.status(404).json({ error: "Image not found" });
 
     res.json(img);
   } catch (err) {
-    console.error("Slug fetch error:", err);
+    console.error("Slug/ID fetch error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
