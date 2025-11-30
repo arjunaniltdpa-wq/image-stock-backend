@@ -121,22 +121,26 @@ router.get("/popular", async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    // Return array only
-    res.json(images.map(img => ({
-      _id: img._id,
-      slug: img.slug,
-      title: img.title,
-      fileName: img.fileName,
-      thumbnailFileName: img.thumbnailFileName,
-      url: buildR2PublicUrl(img.fileName),
-      thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
-    })));
+    res.json({
+      images: images.map(img => ({
+        _id: img._id,
+        slug: img.slug,
+        title: img.title,
+        alt: img.alt,
+        fileName: img.fileName,
+        thumbnailFileName: img.thumbnailFileName,
+
+        thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName),
+        url: buildR2PublicUrl(img.fileName)
+      }))
+    });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Popular fetch failed" });
   }
 });
+
 
 /* --------------------------------------------
    SEARCH
@@ -149,7 +153,6 @@ router.get("/search", async (req, res) => {
       title: { $regex: q, $options: "i" }
     }).limit(60);
 
-    // RETURN ARRAY ONLY — NOT OBJECT
     res.json(
       images.map(img => ({
         _id: img._id,
@@ -158,8 +161,9 @@ router.get("/search", async (req, res) => {
         alt: img.alt,
         fileName: img.fileName,
         thumbnailFileName: img.thumbnailFileName,
-        url: buildR2PublicUrl(img.fileName),
-        thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
+
+        thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName),
+        url: buildR2PublicUrl(img.fileName)
       }))
     );
 
@@ -167,7 +171,6 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
-
 
 /* --------------------------------------------
    GET IMAGE BY ID
@@ -205,15 +208,20 @@ router.get("/related/:cat", async (req, res) => {
       category: { $regex: cat, $options: "i" }
     }).limit(20);
 
-    res.json({
-      images: images.map(img => ({
+    res.json(
+      images.map(img => ({
         _id: img._id,
+        slug: img.slug,
         title: img.title,
+        alt: img.alt,
         fileName: img.fileName,
         thumbnailFileName: img.thumbnailFileName,
-        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
+
+        thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName),
+        url: buildR2PublicUrl(img.fileName)
       }))
-    });
+    );
+
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
