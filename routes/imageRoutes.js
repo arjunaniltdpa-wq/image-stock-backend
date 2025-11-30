@@ -121,23 +121,17 @@ router.get("/popular", async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    res.json({
-      page,
-      images: images.map(img => ({
-        _id: img._id,
-        slug: img.slug,
-        title: img.title,
-        alt: img.alt,
-        fileName: img.fileName,
-        thumbnailFileName: img.thumbnailFileName,
+    // Return array only
+    res.json(images.map(img => ({
+      _id: img._id,
+      slug: img.slug,
+      title: img.title,
+      fileName: img.fileName,
+      thumbnailFileName: img.thumbnailFileName,
+      url: buildR2PublicUrl(img.fileName),
+      thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
+    })));
 
-        // ✔ Correct CDN thumbnail URL from DB
-        thumbnailUrl: img.thumbnailUrl,
-
-        // ✔ Full-size fallback from DB
-        url: img.url
-      }))
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Popular fetch failed" });
@@ -155,19 +149,25 @@ router.get("/search", async (req, res) => {
       title: { $regex: q, $options: "i" }
     }).limit(60);
 
-    res.json({
-      images: images.map(img => ({
+    // RETURN ARRAY ONLY — NOT OBJECT
+    res.json(
+      images.map(img => ({
         _id: img._id,
+        slug: img.slug,
         title: img.title,
+        alt: img.alt,
         fileName: img.fileName,
         thumbnailFileName: img.thumbnailFileName,
-        url: `/api/images/file/${encodeURIComponent(img.thumbnailFileName)}`
+        url: buildR2PublicUrl(img.fileName),
+        thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
       }))
-    });
+    );
+
   } catch (err) {
     res.status(500).json({ error: "Search failed" });
   }
 });
+
 
 /* --------------------------------------------
    GET IMAGE BY ID
