@@ -4,11 +4,21 @@ import Image from "./models/Image.js";
 const router = express.Router();
 
 // ------------------------
-// CONFIG
+// CONFIGURATION
 // ------------------------
-const SITE = "https://pixeora.com";       // Frontend domain
-const CDN = "https://cdn.pixeora.com";    // CDN bucket
+const SITE = "https://pixeora.com";       
+const CDN = "https://cdn.pixeora.com";    
 const IMAGES_PER_SITEMAP = 5000;
+
+// Escape XML special characters
+function escapeXML(str = "") {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 // ------------------------
 // SITEMAP INDEX
@@ -19,13 +29,12 @@ router.get("/sitemap.xml", async (req, res) => {
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
-  <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
+    <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
+    <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
 `;
 
-  // Dynamic image sitemaps (backend)
   for (let i = 1; i <= pages; i++) {
-    xml += `<sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>`;
+    xml += `    <sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
   }
 
   xml += `</sitemapindex>`;
@@ -35,14 +44,10 @@ router.get("/sitemap.xml", async (req, res) => {
 });
 
 // ------------------------
-// STATIC PAGES SITEMAP
+// STATIC PAGES
 // ------------------------
 router.get("/sitemap-static.xml", (req, res) => {
-  const urls = [
-    "/",               // homepage
-    "/legal.html",
-    "/search.html"
-  ];
+  const urls = ["/", "/legal.html", "/search.html"];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -53,18 +58,18 @@ router.get("/sitemap-static.xml", (req, res) => {
   <url>
     <loc>${SITE}${url}</loc>
     <changefreq>weekly</changefreq>
-    <priority>${url === "/" ? "1.0" : "0.7"}</priority>
+    <priority>0.8</priority>
   </url>`;
   });
 
-  xml += `</urlset>`;
+  xml += `\n</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
 });
 
 // ------------------------
-// AI TOOLS SITEMAP
+// TOOLS PAGES
 // ------------------------
 router.get("/sitemap-tools.xml", (req, res) => {
   const tools = [
@@ -87,14 +92,14 @@ router.get("/sitemap-tools.xml", (req, res) => {
   </url>`;
   });
 
-  xml += `</urlset>`;
+  xml += `\n</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
 });
 
 // ------------------------
-// PAGINATED IMAGE SITEMAPS
+// DYNAMIC IMAGE SITEMAPS
 // ------------------------
 router.get("/sitemap-images-:page.xml", async (req, res) => {
   const page = parseInt(req.params.page) || 1;
@@ -112,7 +117,9 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
 
   images.forEach(img => {
     const cleanUrl = `${SITE}/photo/${img.slug}-${img._id}`;
-    const fileToShow = img.thumbnailFileName || img.fileName;
+    const fileToShow = encodeURIComponent(img.thumbnailFileName || img.fileName);
+    const title = escapeXML(img.title || img.name || "Free HD Image");
+    const caption = escapeXML(img.description || img.title || "");
 
     xml += `
   <url>
@@ -121,15 +128,14 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
     <priority>0.9</priority>
 
     <image:image>
-      <image:loc>${CDN}/${encodeURIComponent(fileToShow)}</image:loc>
-      <image:title>${img.title || img.name || "Free HD Image"}</image:title>
-      <image:caption>${img.description || img.title || ""}</image:caption>
+      <image:loc>${CDN}/${fileToShow}</image:loc>
+      <image:title>${title}</image:title>
+      <image:caption>${caption}</image:caption>
     </image:image>
-
   </url>`;
   });
 
-  xml += `</urlset>`;
+  xml += `\n</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
