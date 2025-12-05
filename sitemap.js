@@ -6,8 +6,9 @@ const router = express.Router();
 // ------------------------
 // CONFIGURATION
 // ------------------------
-const SITE = "https://pixeora.com";       
-const CDN = "https://cdn.pixeora.com";    
+const SITE = "https://pixeora.com";
+const API_SITE = "https://api.pixeora.com";  
+const CDN = "https://cdn.pixeora.com";      
 const IMAGES_PER_SITEMAP = 5000;
 
 // Escape XML special characters
@@ -20,8 +21,17 @@ function escapeXML(str = "") {
     .replace(/'/g, "&apos;");
 }
 
+// Generate fallback slug
+function slugify(text = "") {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "image";
+}
+
 // ------------------------
-// SITEMAP INDEX
+// SITEMAP INDEX (MAIN)
 // ------------------------
 router.get("/sitemap.xml", async (req, res) => {
   const count = await Image.countDocuments();
@@ -34,7 +44,7 @@ router.get("/sitemap.xml", async (req, res) => {
 `;
 
   for (let i = 1; i <= pages; i++) {
-    xml += `    <sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
+    xml += `    <sitemap><loc>${API_SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
   }
 
   xml += `</sitemapindex>`;
@@ -57,12 +67,14 @@ router.get("/sitemap-static.xml", (req, res) => {
     xml += `
   <url>
     <loc>${SITE}${url}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`;
   });
 
-  xml += `\n</urlset>`;
+  xml += `
+</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
@@ -87,12 +99,14 @@ router.get("/sitemap-tools.xml", (req, res) => {
     xml += `
   <url>
     <loc>${SITE}${tool}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>`;
   });
 
-  xml += `\n</urlset>`;
+  xml += `
+</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
@@ -111,19 +125,21 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset 
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
->
+  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 `;
 
   images.forEach(img => {
-    const cleanUrl = `${SITE}/photo/${img.slug}-${img._id}`;
+    const generatedSlug = slugify(img.slug || img.name);
+    const cleanUrl = `${SITE}/photo/${generatedSlug}-${img._id}`;
     const fileToShow = encodeURIComponent(img.thumbnailFileName || img.fileName);
     const title = escapeXML(img.title || img.name || "Free HD Image");
     const caption = escapeXML(img.description || img.title || "");
+    const lastmod = img.uploadedAt ? new Date(img.uploadedAt).toISOString() : new Date().toISOString();
 
     xml += `
   <url>
     <loc>${cleanUrl}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
 
@@ -131,11 +147,13 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
       <image:loc>${CDN}/${fileToShow}</image:loc>
       <image:title>${title}</image:title>
       <image:caption>${caption}</image:caption>
+      <image:license>${SITE}/legal.html</image:license>
     </image:image>
   </url>`;
   });
 
-  xml += `\n</urlset>`;
+  xml += `
+</urlset>`;
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
