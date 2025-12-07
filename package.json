@@ -31,6 +31,7 @@
     "mongoose": "^8.19.3",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "openai": "^6.10.0",
     "opencv.js": "^1.2.1",
     "path": "^0.12.7",
     "pdf-lib": "^1.17.1",
