@@ -6,19 +6,19 @@ dotenv.config();
 
 const router = express.Router();
 
-/* Cache dictionary in memory once — huge speed boost */
+// Cache (dictionary + trending + suggestions)
 let cachedDictionary = null;
+let trending = new Map();
+let suggestionCache = new Set();
 
-/* Cloudflare R2 Public URL builder */
+/* R2 Public URL */
 const buildR2 = (file) => {
   let base = process.env.R2_PUBLIC_BASE_URL || "";
   if (!base.endsWith("/")) base += "/";
   return base + encodeURIComponent(file);
 };
 
-/* ===============================
-      WORD NORMALIZATION
-================================== */
+/* Word Normalization */
 function normalizeWord(word) {
   if (word.endsWith("ies")) return word.slice(0, -3) + "y";
   if (word.endsWith("es")) return word.slice(0, -2);
@@ -26,20 +26,18 @@ function normalizeWord(word) {
   return word;
 }
 
-/* Extract words (underscore, hyphen, camelCase safe) */
 function extractWords(text) {
   if (!text) return [];
-  return text
+  return text.toLowerCase()
     .replace(/[_\-]/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[0-9]/g, " ")
-    .toLowerCase()
     .split(/\s+/)
     .map(normalizeWord)
     .filter(w => w.length > 2);
 }
 
-/* Damerau-Levenshtein for typo correction */
+/* Edit Distance */
 function editDistance(a, b) {
   const matrix = [];
   for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -48,17 +46,9 @@ function editDistance(a, b) {
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
       if (b[i - 1] === a[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
-      else matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + 1
-      );
+      else matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + 1);
 
-      if (
-        i > 1 && j > 1 &&
-        b[i - 1] === a[j - 2] &&
-        b[i - 2] === a[j - 1]
-      ) {
+      if (i > 1 && j > 1 && b[i - 1] === a[j - 2] && b[i - 2] === a[j - 1]) {
         matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 1);
       }
     }
@@ -66,10 +56,10 @@ function editDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
-/* Smart Spelling Correction (Distance ≤ 2) */
+/* Spelling Correction */
 function correctWord(word, dictionary) {
   let best = word;
-  let minDist = 3; // 2 = best balance
+  let minDist = 3;
   dictionary.forEach(dbWord => {
     const dist = editDistance(word, dbWord);
     if (dist < minDist) {
@@ -80,44 +70,46 @@ function correctWord(word, dictionary) {
   return best;
 }
 
-/* ==================================
-         MAIN SEARCH ROUTE
-=================================== */
+/* Suggest Similar Words */
+function getSuggestions(word, dictionary) {
+  const suggestions = [];
+  dictionary.forEach(dbWord => {
+    if (editDistance(word, dbWord) <= 2) suggestions.push(dbWord);
+  });
+  return suggestions.slice(0, 5);
+}
+
+/* ======================== SEARCH API ======================== */
 router.get("/", async (req, res) => {
   try {
     const q = req.query.q?.trim();
-    if (!q) return res.json([]);
+    if (!q) return res.json({ results: [], suggestions: [], trending: [] });
 
-    /* Remove unnecessary words */
     const stopWords = new Set(["and", "or", "the", "a", "an", "with", "of", "in", "for", "on", "at", "by"]);
     let words = q.toLowerCase().split(/\s+/).filter(w => w && !stopWords.has(w));
-
-    // Normalize plural forms
     words = words.map(normalizeWord);
 
-    /* Build Dictionary ONLY FIRST TIME */
-    let dictionary = cachedDictionary;
-    if (!dictionary) {
+    if (!cachedDictionary) {
       const docs = await Image.find({}, "title tags keywords category secondaryCategory").lean();
 
-      dictionary = new Set();
+      cachedDictionary = new Set();
       docs.forEach(doc => {
-        extractWords(doc.title).forEach(w => dictionary.add(w));
-        extractWords(doc.category).forEach(w => dictionary.add(w));
-        extractWords(doc.secondaryCategory).forEach(w => dictionary.add(w));
-        if (Array.isArray(doc.tags)) doc.tags.forEach(t => extractWords(t).forEach(w => dictionary.add(w)));
-        if (Array.isArray(doc.keywords)) doc.keywords.forEach(k => extractWords(k).forEach(w => dictionary.add(w)));
+        extractWords(doc.title).forEach(w => cachedDictionary.add(w));
+        extractWords(doc.category).forEach(w => cachedDictionary.add(w));
+        extractWords(doc.secondaryCategory).forEach(w => cachedDictionary.add(w));
+        if (Array.isArray(doc.tags)) doc.tags.forEach(t => extractWords(t).forEach(w => cachedDictionary.add(w)));
+        if (Array.isArray(doc.keywords)) doc.keywords.forEach(k => extractWords(k).forEach(w => cachedDictionary.add(w)));
       });
 
-      cachedDictionary = dictionary; // store in cache memory
-      console.log(`📌 Dictionary Cached: ${dictionary.size} searchable words`);
+      console.log(`📌 Dictionary Cached: ${cachedDictionary.size} words`);
     }
 
-    /* Spell Correct */
-    const correctedWords = words.map(w => correctWord(w, dictionary));
-
-    /* Build Mongo Search */
+    const correctedWords = words.map(w => correctWord(w, cachedDictionary));
     const regexList = correctedWords.map(w => new RegExp(`\\b${w}`, "i"));
+
+    // Save trending search count
+    const mainTerm = correctedWords.join(" ");
+    trending.set(mainTerm, (trending.get(mainTerm) || 0) + 1);
 
     const results = await Image.find({
       $and: regexList.map(r => ({
@@ -129,7 +121,7 @@ router.get("/", async (req, res) => {
       }))
     }).lean().limit(300);
 
-    /* Relevance Scoring */
+    // Scoring
     const scoreField = {
       title: 60, name: 50, keywords: 45, tags: 40,
       description: 25, category: 20, secondaryCategory: 10, alt: 5
@@ -139,7 +131,11 @@ router.get("/", async (req, res) => {
       .map(img => {
         let score = 0;
         for (let field in scoreField) {
-          const value = (img[field] || "").toLowerCase();
+          let value = img[field];
+          if (Array.isArray(value)) value = value.join(" ").toLowerCase();
+          else if (typeof value === "string") value = value.toLowerCase();
+          else value = "";
+
           correctedWords.forEach(w => {
             if (!value) return;
             if (value === w) score += scoreField[field] + 20;
@@ -150,7 +146,6 @@ router.get("/", async (req, res) => {
       })
       .sort((a, b) => b.score - a.score);
 
-    /* Unique */
     const seen = new Set();
     const final = scored.filter(img => {
       const id = img._id.toString();
@@ -159,8 +154,7 @@ router.get("/", async (req, res) => {
       return true;
     });
 
-    /* Add URLs */
-    const response = final.slice(0, 200).map(img => {
+    const responseResults = final.slice(0, 200).map(img => {
       img.thumbnailFileName ||= `thumb_${img.fileName}`;
       img.thumbnailUrl = buildR2(img.thumbnailFileName);
       img.fileUrl = buildR2(img.fileName);
@@ -168,7 +162,11 @@ router.get("/", async (req, res) => {
       return img;
     });
 
-    return res.json(response);
+    return res.json({
+      results: responseResults,
+      suggestions: getSuggestions(words[0], cachedDictionary),
+      trending: Array.from(trending.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    });
 
   } catch (err) {
     console.error("Search error:", err.message);
