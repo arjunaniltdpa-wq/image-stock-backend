@@ -65,8 +65,8 @@ app.use("/api/images", imageRoutes);
 import removeBg from "./routes/removeBg.js";
 app.use("/api/remove-bg", removeBg);
 
-
-
+import popularLatest from "./routes/popularLatest.js";
+app.use("/api/images/popular-latest", popularLatest);
 
 
 // ---------------------------
