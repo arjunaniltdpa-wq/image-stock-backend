@@ -136,13 +136,13 @@ router.get("/", async (req, res) => {
     .sort({ _id: -1 }); // 🔥 Latest first (important)
 
     const scoreField = {
-      title: 60,
-      name: 50,
-      keywords: 45,
-      tags: 40,
+      title: 120,
+      name: 30,
+      keywords: 110,
+      tags: 110,
       description: 25,
-      category: 20,
-      secondaryCategory: 10,
+      category: 100,
+      secondaryCategory: 80,
       alt: 5,
     };
 
@@ -162,7 +162,12 @@ router.get("/", async (req, res) => {
         }
         return { ...img, score };
       })
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        if (b.score === a.score) {
+          return b._id.toString().localeCompare(a._id.toString()); // latest if score same
+        }
+        return b.score - a.score;
+      });
 
     const seen = new Set();
     const final = scored.filter((img) => {
