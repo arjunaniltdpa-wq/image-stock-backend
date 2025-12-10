@@ -180,9 +180,10 @@ router.get("/first", async (req, res) => {
       console.log(`📌 Dictionary Cached: ${dictionary.size} words`);
     }
 
+    // Typo Correct + Auto Variant Expand
     const correctedWords = words.map(w => correctWord(w, dictionary));
     const regexList = correctedWords.flatMap(w =>
-      expandSearchVariants(w).map(v => new RegExp(`\\b${v}`, "i"))
+      expandSearchVariants(w).map(v => new RegExp(v, "i"))
     );
 
     // MAIN SEARCH
@@ -221,9 +222,15 @@ router.get("/first", async (req, res) => {
           if (Array.isArray(value)) value = value.join(" ").toLowerCase();
           else if (typeof value === "string") value = value.toLowerCase();
           else value = "";
+
           correctedWords.forEach((w) => {
-            if (value === w) score += weight[field] + 20;
-            else if (value.includes(w)) score += weight[field];
+            if (value === w) {
+              score += weight[field] + 40;      // EXACT match best
+            } else if (value.startsWith(w)) {
+              score += weight[field] + 20;      // Starts with match
+            } else if (value.includes(w)) {
+              score += weight[field];           // Partial match
+            }
           });
         }
         return { ...img, score };
@@ -252,7 +259,6 @@ router.get("/first", async (req, res) => {
 
     // STORE CACHE
     searchCache.set(q, { timestamp: Date.now(), results: response });
-
     if (searchCache.size > MAX_CACHE_LIMIT) {
       const oldest = searchCache.keys().next().value;
       searchCache.delete(oldest);
@@ -269,6 +275,7 @@ router.get("/first", async (req, res) => {
     return res.status(500).json({ error: "Search failed" });
   }
 });
+
 
 /* ---------- LOAD MORE RESULTS (Cursor Pagination) ---------- */
 router.get("/next", (req, res) => {
