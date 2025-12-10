@@ -18,9 +18,9 @@ const buildR2 = (file) => {
 
 /* Normalize Words (plural -> singular) */
 function normalizeWord(word) {
-  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y"; // families -> family
-  if (word.endsWith("es") && word.length > 3) return word.slice(0, -2);       // buses -> bus
-  if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);        // tigers -> tiger
+  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y"; 
+  if (word.endsWith("es") && word.length > 3) return word.slice(0, -2);       
+  if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);        
   return word;
 }
 
@@ -132,8 +132,8 @@ router.get("/", async (req, res) => {
         ],
       })),
     })
-      .lean()
-      .limit(300);
+    .lean()
+    .sort({ _id: -1 }); // 🔥 Latest first (important)
 
     const scoreField = {
       title: 60,
@@ -172,7 +172,7 @@ router.get("/", async (req, res) => {
       return true;
     });
 
-    const response = final.slice(0, 200).map((img) => {
+    const response = final.map((img) => {
       img.thumbnailFileName ||= `thumb_${img.fileName}`;
       img.thumbnailUrl = buildR2(img.thumbnailFileName);
       img.fileUrl = buildR2(img.fileName);
