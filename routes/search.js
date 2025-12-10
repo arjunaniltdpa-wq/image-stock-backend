@@ -20,13 +20,73 @@ const buildR2 = (file) => {
   return base + encodeURIComponent(file);
 };
 
-/* Normalize Words */
 function normalizeWord(word) {
-  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y";
-  if (word.endsWith("es") && word.length > 3) return word.slice(0, -2);
-  if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);
-  return word;
+  if (!word) return "";
+
+  word = word.toLowerCase();
+
+  // Do NOT modify small words (car, bus, cat allowed separately)
+  if (word.length <= 3) return word;
+
+  // Irregular English noun plural/singular mapping
+  const irregular = {
+    children: "child",
+    men: "man",
+    women: "woman",
+    people: "person",
+    mice: "mouse",
+    geese: "goose",
+    teeth: "tooth",
+    feet: "foot",
+    oxen: "ox",
+    lice: "louse",
+    dice: "die",
+    data: "datum",
+    alumni: "alumnus",
+    cacti: "cactus",
+    fungi: "fungus",
+    nuclei: "nucleus",
+    crises: "crisis",
+    theses: "thesis",
+    analyses: "analysis",
+    ellipses: "ellipsis",
+    parentheses: "parenthesis",
+    indices: "index",
+    appendices: "appendix",
+    criteria: "criterion",
+    phenomena: "phenomenon",
+  };
+
+  if (irregular[word]) return irregular[word];
+
+  // Auto plural detection — reverse mapping
+  const reverseIrregular = Object.fromEntries(
+    Object.entries(irregular).map(([pl, sg]) => [sg, pl])
+  );
+
+  if (reverseIrregular[word]) return word; // keep singular
+
+  // ✨ Pattern Rules — AI style
+  if (word.endsWith("ies")) return word.slice(0, -3) + "y"; // ladies -> lady, cities -> city
+  if (word.endsWith("ves")) return word.slice(0, -3) + "f"; // wolves -> wolf, knives -> knif
+  if (word.endsWith("xes") || word.endsWith("ses") || word.endsWith("zes")) return word.slice(0, -2); // boxes, buses → boxe, buse
+  if (word.endsWith("shes") || word.endsWith("ches")) return word.slice(0, -2); // dishes -> dish
+  if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1); // cars->car, apples->apple
+
+  return word;  
 }
+
+function expandSearchVariants(word) {
+  const variants = new Set([word]);
+
+  // Basic plural adders
+  if (!word.endsWith("s")) variants.add(word + "s");
+  if (word.endsWith("y")) variants.add(word.replace(/y$/, "ies"));
+  if (word.endsWith("f")) variants.add(word.replace(/f$/, "ves"));
+
+  return Array.from(variants);
+}
+
 
 /* Extract dictionary words */
 function extractWords(text) {
@@ -121,7 +181,9 @@ router.get("/first", async (req, res) => {
     }
 
     const correctedWords = words.map(w => correctWord(w, dictionary));
-    const regexList = correctedWords.map(w => new RegExp(`\\b${w}`, "i"));
+    const regexList = correctedWords.flatMap(w =>
+      expandSearchVariants(w).map(v => new RegExp(`\\b${v}`, "i"))
+    );
 
     // MAIN SEARCH
     const results = await Image.find({
@@ -140,7 +202,7 @@ router.get("/first", async (req, res) => {
     }).lean();
 
     // SCORE WEIGHT
-    const weight = {
+    const weight = {    
       title: 120,
       name: 30,
       keywords: 110,
