@@ -5,12 +5,13 @@ dotenv.config();
 
 const router = express.Router();
 
-// Cache dictionary
+// Cache dictionary once
 let cachedDictionary = null;
 
-// Search Result Cache (Relevance results stored temporarily)
+// Search Cache (Relevance results)
 const searchCache = new Map();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 10 * 60 * 1000; // 10 mins
+const MAX_CACHE_LIMIT = 200; // Avoid memory overload
 
 /* Build Cloudflare R2 URL */
 const buildR2 = (file) => {
@@ -27,7 +28,7 @@ function normalizeWord(word) {
   return word;
 }
 
-/* Extract words */
+/* Extract dictionary words */
 function extractWords(text) {
   if (!text) return [];
   return text
@@ -40,7 +41,7 @@ function extractWords(text) {
     .filter((w) => w.length > 2);
 }
 
-/* Damerau–Levenshtein Typo */
+/* Damerau-Levenshtein (Typo Fix) */
 function editDistance(a, b) {
   const matrix = [];
   for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -64,7 +65,7 @@ function editDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
-/* Spelling Correction */
+/* Typo Correction */
 function correctWord(word, dictionary) {
   let best = word;
   let minDist = 3;
@@ -78,55 +79,53 @@ function correctWord(word, dictionary) {
   return best;
 }
 
-/* ---------- SEARCH FIRST RESULTS (Relevance + Cache + First 50) ---------- */
+/* ---------- FIRST SEARCH (Relevance + Cache + Latest) ---------- */
 router.get("/first", async (req, res) => {
   try {
     const q = req.query.q?.trim();
     const limit = parseInt(req.query.limit) || 50;
     if (!q) return res.json([]);
 
-    // 🔹 Check Cache
+    // CACHE CHECK
     if (searchCache.has(q)) {
-      const cacheEntry = searchCache.get(q);
-      if (Date.now() - cacheEntry.timestamp < CACHE_TTL) {
+      const entry = searchCache.get(q);
+      if (Date.now() - entry.timestamp < CACHE_TTL) {
         return res.json({
-          images: cacheEntry.results.slice(0, limit),
+          images: entry.results.slice(0, limit),
           nextCursor: limit,
-          total: cacheEntry.results.length
+          total: entry.results.length
         });
-      } else {
-        searchCache.delete(q);
       }
+      searchCache.delete(q);
     }
 
-    const stopWords = new Set(["and", "or", "the", "a", "an", "with", "of", "in", "for", "on", "at", "by"]);
+    // STOP WORDS
+    const stopWords = new Set(["and","or","the","a","an","with","of","in","for","on","at","by"]);
     let words = q.toLowerCase().split(/\s+/).filter((w) => w && !stopWords.has(w)).map(normalizeWord);
     if (!words.length) return res.json([]);
 
-    // Dictionary build
+    // DICTIONARY BUILD
     let dictionary = cachedDictionary;
     if (!dictionary) {
       const docs = await Image.find({}, "title tags keywords category secondaryCategory").lean();
-
       dictionary = new Set();
-      docs.forEach((doc) => {
-        extractWords(doc.title).forEach((w) => dictionary.add(w));
-        extractWords(doc.category).forEach((w) => dictionary.add(w));
-        extractWords(doc.secondaryCategory).forEach((w) => dictionary.add(w));
-        if (Array.isArray(doc.tags)) doc.tags.forEach((t) => extractWords(t).forEach((w) => dictionary.add(w)));
-        if (Array.isArray(doc.keywords)) doc.keywords.forEach((k) => extractWords(k).forEach((w) => dictionary.add(w)));
+      docs.forEach(doc => {
+        extractWords(doc.title).forEach(w => dictionary.add(w));
+        extractWords(doc.category).forEach(w => dictionary.add(w));
+        extractWords(doc.secondaryCategory).forEach(w => dictionary.add(w));
+        if (Array.isArray(doc.tags)) doc.tags.forEach(t => extractWords(t).forEach(w => dictionary.add(w)));
+        if (Array.isArray(doc.keywords)) doc.keywords.forEach(k => extractWords(k).forEach(w => dictionary.add(w)));
       });
-
       cachedDictionary = dictionary;
       console.log(`📌 Dictionary Cached: ${dictionary.size} words`);
     }
 
-    const correctedWords = words.map((w) => correctWord(w, dictionary));
-    const regexList = correctedWords.map((w) => new RegExp(`\\b${w}`, "i"));
+    const correctedWords = words.map(w => correctWord(w, dictionary));
+    const regexList = correctedWords.map(w => new RegExp(`\\b${w}`, "i"));
 
-    // Search DB
+    // MAIN SEARCH
     const results = await Image.find({
-      $and: regexList.map((r) => ({
+      $and: regexList.map(r => ({
         $or: [
           { title: r },
           { name: r },
@@ -136,12 +135,12 @@ router.get("/first", async (req, res) => {
           { alt: r },
           { tags: r },
           { keywords: r },
-        ],
-      })),
-    }).lean().sort({ _id: -1 });
+        ]
+      }))
+    }).lean();
 
-    // Scoring relevance
-    const scoreField = {
+    // SCORE WEIGHT
+    const weight = {
       title: 120,
       name: 30,
       keywords: 110,
@@ -155,45 +154,52 @@ router.get("/first", async (req, res) => {
     const scored = results
       .map((img) => {
         let score = 0;
-        for (let field in scoreField) {
+        for (let field in weight) {
           let value = img[field];
           if (Array.isArray(value)) value = value.join(" ").toLowerCase();
           else if (typeof value === "string") value = value.toLowerCase();
           else value = "";
           correctedWords.forEach((w) => {
-            if (value === w) score += scoreField[field] + 20;
-            else if (value.includes(w)) score += scoreField[field];
+            if (value === w) score += weight[field] + 20;
+            else if (value.includes(w)) score += weight[field];
           });
         }
         return { ...img, score };
       })
-      .sort((a, b) => (b.score === a.score ? b._id - a._id : b.score - a.score));
+      .sort((a, b) => {
+        if (b.score === a.score) {
+          return b._id.toString().localeCompare(a._id.toString()); // latest wins
+        }
+        return b.score - a.score;
+      });
 
     const seen = new Set();
-    const final = scored.filter((img) => {
+    const final = scored.filter(img => {
       const id = img._id.toString();
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
 
-    const response = final.map((img) => ({
+    const response = final.map(img => ({
       ...img,
       thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
       thumbnailUrl: buildR2(img.thumbnailFileName || `thumb_${img.fileName}`),
       fileUrl: buildR2(img.fileName),
     }));
 
-    // Cache Store
-    searchCache.set(q, {
-      timestamp: Date.now(),
-      results: response,
-    });
+    // STORE CACHE
+    searchCache.set(q, { timestamp: Date.now(), results: response });
+
+    if (searchCache.size > MAX_CACHE_LIMIT) {
+      const oldest = searchCache.keys().next().value;
+      searchCache.delete(oldest);
+    }
 
     return res.json({
       images: response.slice(0, limit),
       nextCursor: limit,
-      total: response.length,
+      total: response.length
     });
 
   } catch (err) {
@@ -202,8 +208,7 @@ router.get("/first", async (req, res) => {
   }
 });
 
-/* ---------- LOAD MORE SEARCH RESULTS (Cursor Pagination) ---------- */
-
+/* ---------- LOAD MORE RESULTS (Cursor Pagination) ---------- */
 router.get("/next", (req, res) => {
   const q = req.query.q?.trim();
   const cursor = parseInt(req.query.cursor);
@@ -213,9 +218,8 @@ router.get("/next", (req, res) => {
     return res.status(400).json({ error: "No cached search found" });
   }
 
-  const cacheEntry = searchCache.get(q);
-  const results = cacheEntry.results;
-
+  const entry = searchCache.get(q);
+  const results = entry.results;
   const nextSlice = results.slice(cursor, cursor + limit);
   const nextCursor = cursor + nextSlice.length;
 
