@@ -1,4 +1,3 @@
-// routes/search.js
 import express from "express";
 import Image from "../models/Image.js";
 import dotenv from "dotenv";
@@ -6,8 +5,12 @@ dotenv.config();
 
 const router = express.Router();
 
-// Cache dictionary (for speed)
+// Cache dictionary
 let cachedDictionary = null;
+
+// Search Result Cache (Relevance results stored temporarily)
+const searchCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 /* Build Cloudflare R2 URL */
 const buildR2 = (file) => {
@@ -16,11 +19,11 @@ const buildR2 = (file) => {
   return base + encodeURIComponent(file);
 };
 
-/* Normalize Words (plural -> singular) */
+/* Normalize Words */
 function normalizeWord(word) {
-  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y"; 
-  if (word.endsWith("es") && word.length > 3) return word.slice(0, -2);       
-  if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);        
+  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y";
+  if (word.endsWith("es") && word.length > 3) return word.slice(0, -2);
+  if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);
   return word;
 }
 
@@ -53,13 +56,7 @@ function editDistance(a, b) {
           matrix[i - 1][j - 1] + 1
         );
       }
-
-      if (
-        i > 1 &&
-        j > 1 &&
-        b[i - 1] === a[j - 2] &&
-        b[i - 2] === a[j - 1]
-      ) {
+      if (i > 1 && j > 1 && b[i - 1] === a[j - 2] && b[i - 2] === a[j - 1]) {
         matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 1);
       }
     }
@@ -81,21 +78,32 @@ function correctWord(word, dictionary) {
   return best;
 }
 
-/* MAIN SEARCH */
-router.get("/", async (req, res) => {
+/* ---------- SEARCH FIRST RESULTS (Relevance + Cache + First 50) ---------- */
+router.get("/first", async (req, res) => {
   try {
     const q = req.query.q?.trim();
+    const limit = parseInt(req.query.limit) || 50;
     if (!q) return res.json([]);
 
-    const stopWords = new Set(["and", "or", "the", "a", "an", "with", "of", "in", "for", "on", "at", "by"]);
-    let words = q
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w && !stopWords.has(w))
-      .map(normalizeWord);
+    // 🔹 Check Cache
+    if (searchCache.has(q)) {
+      const cacheEntry = searchCache.get(q);
+      if (Date.now() - cacheEntry.timestamp < CACHE_TTL) {
+        return res.json({
+          images: cacheEntry.results.slice(0, limit),
+          nextCursor: limit,
+          total: cacheEntry.results.length
+        });
+      } else {
+        searchCache.delete(q);
+      }
+    }
 
+    const stopWords = new Set(["and", "or", "the", "a", "an", "with", "of", "in", "for", "on", "at", "by"]);
+    let words = q.toLowerCase().split(/\s+/).filter((w) => w && !stopWords.has(w)).map(normalizeWord);
     if (!words.length) return res.json([]);
 
+    // Dictionary build
     let dictionary = cachedDictionary;
     if (!dictionary) {
       const docs = await Image.find({}, "title tags keywords category secondaryCategory").lean();
@@ -105,10 +113,8 @@ router.get("/", async (req, res) => {
         extractWords(doc.title).forEach((w) => dictionary.add(w));
         extractWords(doc.category).forEach((w) => dictionary.add(w));
         extractWords(doc.secondaryCategory).forEach((w) => dictionary.add(w));
-        if (Array.isArray(doc.tags))
-          doc.tags.forEach((t) => extractWords(t).forEach((w) => dictionary.add(w)));
-        if (Array.isArray(doc.keywords))
-          doc.keywords.forEach((k) => extractWords(k).forEach((w) => dictionary.add(w)));
+        if (Array.isArray(doc.tags)) doc.tags.forEach((t) => extractWords(t).forEach((w) => dictionary.add(w)));
+        if (Array.isArray(doc.keywords)) doc.keywords.forEach((k) => extractWords(k).forEach((w) => dictionary.add(w)));
       });
 
       cachedDictionary = dictionary;
@@ -118,6 +124,7 @@ router.get("/", async (req, res) => {
     const correctedWords = words.map((w) => correctWord(w, dictionary));
     const regexList = correctedWords.map((w) => new RegExp(`\\b${w}`, "i"));
 
+    // Search DB
     const results = await Image.find({
       $and: regexList.map((r) => ({
         $or: [
@@ -131,10 +138,9 @@ router.get("/", async (req, res) => {
           { keywords: r },
         ],
       })),
-    })
-    .lean()
-    .sort({ _id: -1 }); // 🔥 Latest first (important)
+    }).lean().sort({ _id: -1 });
 
+    // Scoring relevance
     const scoreField = {
       title: 120,
       name: 30,
@@ -154,7 +160,6 @@ router.get("/", async (req, res) => {
           if (Array.isArray(value)) value = value.join(" ").toLowerCase();
           else if (typeof value === "string") value = value.toLowerCase();
           else value = "";
-
           correctedWords.forEach((w) => {
             if (value === w) score += scoreField[field] + 20;
             else if (value.includes(w)) score += scoreField[field];
@@ -162,12 +167,7 @@ router.get("/", async (req, res) => {
         }
         return { ...img, score };
       })
-      .sort((a, b) => {
-        if (b.score === a.score) {
-          return b._id.toString().localeCompare(a._id.toString()); // latest if score same
-        }
-        return b.score - a.score;
-      });
+      .sort((a, b) => (b.score === a.score ? b._id - a._id : b.score - a.score));
 
     const seen = new Set();
     const final = scored.filter((img) => {
@@ -177,19 +177,53 @@ router.get("/", async (req, res) => {
       return true;
     });
 
-    const response = final.map((img) => {
-      img.thumbnailFileName ||= `thumb_${img.fileName}`;
-      img.thumbnailUrl = buildR2(img.thumbnailFileName);
-      img.fileUrl = buildR2(img.fileName);
-      delete img.score;
-      return img;
+    const response = final.map((img) => ({
+      ...img,
+      thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
+      thumbnailUrl: buildR2(img.thumbnailFileName || `thumb_${img.fileName}`),
+      fileUrl: buildR2(img.fileName),
+    }));
+
+    // Cache Store
+    searchCache.set(q, {
+      timestamp: Date.now(),
+      results: response,
     });
 
-    return res.json(response);
+    return res.json({
+      images: response.slice(0, limit),
+      nextCursor: limit,
+      total: response.length,
+    });
+
   } catch (err) {
-    console.error("Search error:", err.message);
+    console.error("Search FIRST ERROR:", err.message);
     return res.status(500).json({ error: "Search failed" });
   }
+});
+
+/* ---------- LOAD MORE SEARCH RESULTS (Cursor Pagination) ---------- */
+
+router.get("/next", (req, res) => {
+  const q = req.query.q?.trim();
+  const cursor = parseInt(req.query.cursor);
+  const limit = parseInt(req.query.limit) || 50;
+
+  if (!q || !searchCache.has(q)) {
+    return res.status(400).json({ error: "No cached search found" });
+  }
+
+  const cacheEntry = searchCache.get(q);
+  const results = cacheEntry.results;
+
+  const nextSlice = results.slice(cursor, cursor + limit);
+  const nextCursor = cursor + nextSlice.length;
+
+  return res.json({
+    images: nextSlice,
+    nextCursor: nextCursor < results.length ? nextCursor : null,
+    total: results.length
+  });
 });
 
 export default router;
