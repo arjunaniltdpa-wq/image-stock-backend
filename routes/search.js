@@ -5,298 +5,359 @@ dotenv.config();
 
 const router = express.Router();
 
-// Cache dictionary once
+// Cache dictionary once (for typo fallback) + search cache
 let cachedDictionary = null;
-
-// Search Cache (Relevance results)
 const searchCache = new Map();
-const CACHE_TTL = 10 * 60 * 1000; // 10 mins
-const MAX_CACHE_LIMIT = 200; // Avoid memory overload
+const CACHE_TTL = 10 * 60 * 1000; // 10min
+const MAX_CACHE_LIMIT = 300;
+const MAX_CANDIDATES = 1200; // fetch at most this many documents to score in Node
 
-/* Build Cloudflare R2 URL */
-const buildR2 = (file) => {
-  let base = process.env.R2_PUBLIC_BASE_URL || "";
-  if (!base.endsWith("/")) base += "/";
-  return base + encodeURIComponent(file);
-};
-
-function normalizeWord(word) {
-  if (!word) return "";
-
-  word = word.toLowerCase();
-
-  // Do NOT modify small words (car, bus, cat allowed separately)
-  if (word.length <= 3) return word;
-
-  // Irregular English noun plural/singular mapping
-  const irregular = {
-    children: "child",
-    men: "man",
-    women: "woman",
-    people: "person",
-    mice: "mouse",
-    geese: "goose",
-    teeth: "tooth",
-    feet: "foot",
-    oxen: "ox",
-    lice: "louse",
-    dice: "die",
-    data: "datum",
-    alumni: "alumnus",
-    cacti: "cactus",
-    fungi: "fungus",
-    nuclei: "nucleus",
-    crises: "crisis",
-    theses: "thesis",
-    analyses: "analysis",
-    ellipses: "ellipsis",
-    parentheses: "parenthesis",
-    indices: "index",
-    appendices: "appendix",
-    criteria: "criterion",
-    phenomena: "phenomenon",
-  };
-
-  if (irregular[word]) return irregular[word];
-
-  // Auto plural detection — reverse mapping
-  const reverseIrregular = Object.fromEntries(
-    Object.entries(irregular).map(([pl, sg]) => [sg, pl])
-  );
-
-  if (reverseIrregular[word]) return word; // keep singular
-
-  // ✨ Pattern Rules — AI style
-  if (word.endsWith("ies")) return word.slice(0, -3) + "y"; // ladies -> lady, cities -> city
-  if (word.endsWith("ves")) return word.slice(0, -3) + "f"; // wolves -> wolf, knives -> knif
-  if (word.endsWith("xes") || word.endsWith("ses") || word.endsWith("zes")) return word.slice(0, -2); // boxes, buses → boxe, buse
-  if (word.endsWith("shes") || word.endsWith("ches")) return word.slice(0, -2); // dishes -> dish
-  if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1); // cars->car, apples->apple
-
-  return word;  
+/* Utility: safe tokenizer — keeps small words but preserves important ones */
+function tokenizeQuery(q) {
+  if (!q) return [];
+  return q
+    .toLowerCase()
+    .replace(/[_\-]+/g, " ")
+    .replace(/[^\p{L}0-9\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
 }
 
-function expandSearchVariants(word) {
-  const variants = new Set([word]);
+/* Simple morphological expansions (not full stemmer but good coverage) */
+function generateVariants(token) {
+  const variants = new Set([token]);
+  if (token.length > 2) {
+    // plural/singular heuristics
+    if (token.endsWith("s")) variants.add(token.slice(0, -1));
+    else variants.add(token + "s");
 
-  // Basic plural adders
-  if (!word.endsWith("s")) variants.add(word + "s");
-  if (word.endsWith("y")) variants.add(word.replace(/y$/, "ies"));
-  if (word.endsWith("f")) variants.add(word.replace(/f$/, "ves"));
-
+    if (token.endsWith("ies")) variants.add(token.slice(0, -3) + "y");
+    if (token.endsWith("y")) variants.add(token.slice(0, -1) + "ies");
+    if (token.endsWith("ves")) variants.add(token.slice(0, -3) + "f");
+    if (token.endsWith("f")) variants.add(token.slice(0, -1) + "ves");
+    if (token.endsWith("es")) variants.add(token.slice(0, -2));
+  }
   return Array.from(variants);
 }
 
-
-/* Extract dictionary words */
-function extractWords(text) {
-  if (!text) return [];
-  return text
-    .toLowerCase()
-    .replace(/[_\-]/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[0-9]/g, " ")
-    .split(/\s+/)
-    .map(normalizeWord)
-    .filter((w) => w.length > 2);
-}
-
-/* Damerau-Levenshtein (Typo Fix) */
-function editDistance(a, b) {
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+/* Damerau-Levenshtein — optimized enough for small sets (bounded) */
+function editDistance(a, b, maxDist = 2) {
+  // early checks
+  if (Math.abs(a.length - b.length) > maxDist) return 9999;
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => Array(a.length + 1).fill(0));
+  for (let i = 0; i <= b.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= a.length; j++) dp[0][j] = j;
 
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
-      if (b[i - 1] === a[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
-      else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + 1
-        );
-      }
+      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
       if (i > 1 && j > 1 && b[i - 1] === a[j - 2] && b[i - 2] === a[j - 1]) {
-        matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 1);
+        dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1);
       }
+    }
+    // early prune row if smallest > maxDist
+    if (Math.min(...dp[i]) > maxDist) {
+      // continue — we still finish because further rows may drop
     }
   }
-  return matrix[b.length][a.length];
+  return dp[b.length][a.length];
 }
 
-/* Typo Correction */
-function correctWord(word, dictionary) {
-  let best = word;
-  let minDist = 3;
-  dictionary.forEach((dbWord) => {
-    const dist = editDistance(word, dbWord);
-    if (dist < minDist) {
-      minDist = dist;
-      best = dbWord;
+/* Build a cached dictionary of words from the DB (used only for typo fallback) */
+async function buildDictionary() {
+  if (cachedDictionary) return cachedDictionary;
+  const docs = await Image.find({}, "title tags keywords category secondaryCategory name").lean();
+  const dict = new Set();
+  docs.forEach(doc => {
+    const fields = [doc.title, doc.name, doc.category, doc.secondaryCategory];
+    if (Array.isArray(doc.tags)) fields.push(...doc.tags);
+    if (Array.isArray(doc.keywords)) fields.push(...doc.keywords);
+    fields.forEach(f => {
+      if (!f) return;
+      const words = f.toString().toLowerCase().replace(/[_\-\.\,]/g, " ").split(/\s+/).filter(Boolean);
+      words.forEach(w => { if (w.length > 1) dict.add(w); });
+    });
+  });
+  cachedDictionary = Array.from(dict);
+  console.log(`Dictionary built: ${cachedDictionary.length} words`);
+  return cachedDictionary;
+}
+
+/* Score function: powerful, multi-tiered scoring */
+function scoreImageForQuery(img, tokens, tokenVariants, weights, nowTs) {
+  // fields: title, keywords (arr or string), tags (arr), category, secondaryCategory, description, alt, name
+  let score = 0;
+  const textFields = {};
+  for (const f of Object.keys(weights)) {
+    let v = img[f];
+    if (!v) { textFields[f] = ""; continue; }
+    if (Array.isArray(v)) textFields[f] = v.join(" ").toLowerCase();
+    else textFields[f] = v.toString().toLowerCase();
+  }
+
+  // Phrase exact boost: full query phrase appears in title or keywords
+  const phrase = tokens.join(" ");
+  if (phrase && (textFields.title.includes(phrase) || textFields.keywords?.includes(phrase))) {
+    score += 1000;
+  }
+
+  // token-level scoring and counters
+  let tokensFound = 0;
+  let tokenMatches = 0;
+
+  tokens.forEach(token => {
+    const variants = tokenVariants[token] || [token];
+    let matchedThisToken = false;
+
+    for (const field of Object.keys(weights)) {
+      const txt = textFields[field] || "";
+      // exact word match (word boundary)
+      const exactRe = new RegExp(`\\b${token}\\b`, "i");
+      if (exactRe.test(txt)) {
+        score += weights[field] * 6;
+        matchedThisToken = true;
+        tokenMatches++;
+        continue; // exact is best for this field
+      }
+      // starts-with
+      const startsRe = new RegExp(`\\b${token}`, "i");
+      if (startsRe.test(txt)) {
+        score += weights[field] * 4;
+        matchedThisToken = true;
+        tokenMatches++;
+        continue;
+      }
+      // partial
+      if (txt.includes(token)) {
+        score += weights[field] * 2;
+        matchedThisToken = true;
+        tokenMatches++;
+        continue;
+      }
+      // variants
+      for (const v of variants) {
+        if (v === token) continue;
+        if (txt.includes(v)) {
+          score += Math.floor(weights[field] * 1.2);
+          matchedThisToken = true;
+          tokenMatches++;
+          break;
+        }
+      }
+      if (matchedThisToken) break;
+    }
+
+    if (matchedThisToken) tokensFound++;
+    else {
+      // no direct match — allow a small contribution from fuzzy matches in title/keywords only
+      const fieldsToTry = ["title", "keywords"];
+      for (const f of fieldsToTry) {
+        const txt = (textFields[f] || "").split(/\s+/);
+        for (const w of txt) {
+          if (!w) continue;
+          const d = editDistance(token, w, 2);
+          if (d <= 1) { // very close
+            score += Math.floor(weights[f] * 0.8);
+            matchedThisToken = true;
+            tokensFound++;
+            break;
+          }
+        }
+        if (matchedThisToken) break;
+      }
     }
   });
-  return best;
+
+  // strong boost if ALL tokens appear somewhere (multi-word AND boost)
+  if (tokensFound === tokens.length && tokens.length > 0) {
+    score += 700;
+  } else if (tokenMatches > 0) {
+    // partial match boost proportional to matches
+    score += tokenMatches * 15;
+  }
+
+  // small boost for shorter images (less noise) if title length small
+  if (img.title && img.title.length < 40) score += 20;
+
+  // recency/time boost if createdAt present
+  if (img.createdAt) {
+    const ageDays = Math.max(0, (nowTs - new Date(img.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (ageDays < 30) score += Math.max(0, Math.floor((30 - ageDays) / 2)); // newest get small advantage
+  }
+
+  // length normalization penalty (very long text fields may get smaller boost)
+  return score;
 }
 
-/* ---------- FIRST SEARCH (Relevance + Cache + Latest) ---------- */
+/* ---------- FIRST (Advanced) ---------- */
 router.get("/first", async (req, res) => {
   try {
-    const q = req.query.q?.trim();
-    const limit = parseInt(req.query.limit) || 50;
-    if (!q) return res.json([]);
+    const rawQ = (req.query.q || "").trim();
+    if (!rawQ) return res.json({ images: [], nextCursor: null, total: 0 });
 
-    // CACHE CHECK
+    const q = rawQ.toLowerCase();
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 10), 200);
+    const pageLimit = limit;
+
+    // cached response quick return
     if (searchCache.has(q)) {
       const entry = searchCache.get(q);
       if (Date.now() - entry.timestamp < CACHE_TTL) {
         return res.json({
-          images: entry.results.slice(0, limit),
-          nextCursor: limit,
-          total: entry.results.length
+          images: entry.results.slice(0, pageLimit),
+          nextCursor: pageLimit,
+          total: entry.results.length,
         });
       }
       searchCache.delete(q);
     }
 
-    // STOP WORDS
-    const stopWords = new Set(["and","or","the","a","an","with","of","in","for","on","at","by"]);
-    let words = q.toLowerCase().split(/\s+/).filter((w) => w && !stopWords.has(w)).map(normalizeWord);
-    if (!words.length) return res.json([]);
+    // tokenization & variants
+    const tokens = tokenizeQuery(q);
+    if (!tokens.length) return res.json({ images: [], nextCursor: null, total: 0 });
+    const tokenVariants = {};
+    tokens.forEach(t => tokenVariants[t] = generateVariants(t));
 
-    // DICTIONARY BUILD
-    let dictionary = cachedDictionary;
-    if (!dictionary) {
-      const docs = await Image.find({}, "title tags keywords category secondaryCategory").lean();
-      dictionary = new Set();
-      docs.forEach(doc => {
-        extractWords(doc.title).forEach(w => dictionary.add(w));
-        extractWords(doc.category).forEach(w => dictionary.add(w));
-        extractWords(doc.secondaryCategory).forEach(w => dictionary.add(w));
-        if (Array.isArray(doc.tags)) doc.tags.forEach(t => extractWords(t).forEach(w => dictionary.add(w)));
-        if (Array.isArray(doc.keywords)) doc.keywords.forEach(k => extractWords(k).forEach(w => dictionary.add(w)));
+    // Build coarse DB filter — loose OR on tokens across main fields.
+    // This avoids scanning entire DB. We'll fetch a candidate pool and score in node.
+    const ors = [];
+    tokens.forEach(t => {
+      const variants = tokenVariants[t];
+      variants.forEach(v => {
+        const re = new RegExp(v.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
+        ors.push({ title: re });
+        ors.push({ keywords: re });
+        ors.push({ tags: re });
+        ors.push({ category: re });
+        ors.push({ secondaryCategory: re });
+        ors.push({ description: re });
+        ors.push({ alt: re });
+        ors.push({ name: re });
       });
-      cachedDictionary = dictionary;
-      console.log(`📌 Dictionary Cached: ${dictionary.size} words`);
-    }
-
-    // Typo Correct + Auto Variant Expand
-    const correctedWords = words.map(w => correctWord(w, dictionary));
-    const regexList = correctedWords.flatMap(w =>
-      expandSearchVariants(w).map(v => new RegExp(v, "i"))
-    );
-
-    // MAIN SEARCH
-    const results = await Image.find({
-      $and: regexList.map(r => ({
-        $or: [
-          { title: r },
-          { name: r },
-          { description: r },
-          { category: r },
-          { secondaryCategory: r },
-          { alt: r },
-          { tags: r },
-          { keywords: r },
-        ]
-      }))
-    }).lean();
-
-    // SCORE WEIGHT
-    const weight = {    
-      title: 120,
-      name: 30,
-      keywords: 110,
-      tags: 110,
-      description: 25,
-      category: 100,
-      secondaryCategory: 80,
-      alt: 5,
-    };
-
-    const scored = results
-      .map((img) => {
-        let score = 0;
-        for (let field in weight) {
-          let value = img[field];
-          if (Array.isArray(value)) value = value.join(" ").toLowerCase();
-          else if (typeof value === "string") value = value.toLowerCase();
-          else value = "";
-
-          correctedWords.forEach((w) => {
-            if (value === w) {
-              score += weight[field] + 40;      // EXACT match best
-            } else if (value.startsWith(w)) {
-              score += weight[field] + 20;      // Starts with match
-            } else if (value.includes(w)) {
-              score += weight[field];           // Partial match
-            }
-          });
-        }
-        return { ...img, score };
-      })
-      .sort((a, b) => {
-        if (b.score === a.score) {
-          return b._id.toString().localeCompare(a._id.toString()); // latest wins
-        }
-        return b.score - a.score;
-      });
-
-    const seen = new Set();
-    const final = scored.filter(img => {
-      const id = img._id.toString();
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
     });
 
-    const response = final.map(img => ({
-      ...img,
-      thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
-      thumbnailUrl: buildR2(img.thumbnailFileName || `thumb_${img.fileName}`),
-      fileUrl: buildR2(img.fileName),
-    }));
+    // Also allow a fast $text fallback for phrase boost if text index exists
+    // (it will be combined later by node scoring)
+    const textQuery = { $or: ors };
 
-    // STORE CACHE
-    searchCache.set(q, { timestamp: Date.now(), results: response });
+    const candidates = await Image.find(textQuery)
+      .limit(MAX_CANDIDATES)
+      .lean();
+
+    // If candidates are empty and we want typo fallback, build dictionary and find near words
+    let finalCandidates = candidates;
+    if ((!candidates || candidates.length === 0) && tokens.length > 0) {
+      // build dictionary once
+      const dict = await buildDictionary();
+      // for each token, find close dict words
+      const closeMap = {};
+      for (const token of tokens) {
+        const close = [];
+        for (const w of dict) {
+          const d = editDistance(token, w, 2);
+          if (d <= 1) close.push(w);
+          if (close.length >= 8) break;
+        }
+        if (close.length) closeMap[token] = close;
+      }
+      // if we found some close words, redo the DB query with the closeMap
+      const closeOrs = [];
+      for (const token in closeMap) {
+        for (const w of closeMap[token]) {
+          const re = new RegExp(w.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
+          closeOrs.push({ title: re }, { keywords: re }, { tags: re }, { category: re }, { secondaryCategory: re });
+        }
+      }
+      if (closeOrs.length) {
+        finalCandidates = await Image.find({ $or: closeOrs }).limit(MAX_CANDIDATES).lean();
+      }
+    }
+
+    // scoring weights (tweak these numbers to taste)
+    const weights = {
+      title: 120,
+      keywords: 110,
+      tags: 100,
+      category: 90,
+      secondaryCategory: 70,
+      description: 20,
+      alt: 10,
+      name: 5,
+    };
+
+    // Score each candidate
+    const nowTs = Date.now();
+    const scored = finalCandidates.map(img => {
+      const s = scoreImageForQuery(img, tokens, tokenVariants, weights, nowTs);
+      return { ...img, score: s };
+    });
+
+    // sort by score desc, createdAt fallback
+    scored.sort((a, b) => {
+      if (b.score === a.score) {
+        if (b.createdAt && a.createdAt) return new Date(b.createdAt) - new Date(a.createdAt);
+        return b._id.toString().localeCompare(a._id.toString());
+      }
+      return b.score - a.score;
+    });
+
+    // De-duplicate & prepare final response
+    const seen = new Set();
+    const final = [];
+    for (const img of scored) {
+      const id = img._id.toString();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      final.push({
+        ...img,
+        thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
+        thumbnailUrl: (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/?$/, "/") + encodeURIComponent(img.thumbnailFileName || `thumb_${img.fileName}`),
+        fileUrl: (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/?$/, "/") + encodeURIComponent(img.fileName),
+      });
+    }
+
+    // cache top results
+    searchCache.set(q, { timestamp: Date.now(), results: final });
     if (searchCache.size > MAX_CACHE_LIMIT) {
       const oldest = searchCache.keys().next().value;
       searchCache.delete(oldest);
     }
 
     return res.json({
-      images: response.slice(0, limit),
-      nextCursor: limit,
-      total: response.length
+      images: final.slice(0, pageLimit),
+      nextCursor: pageLimit < final.length ? pageLimit : null,
+      total: final.length,
     });
-
   } catch (err) {
-    console.error("Search FIRST ERROR:", err.message);
+    console.error("Advanced SEARCH ERROR:", err);
     return res.status(500).json({ error: "Search failed" });
   }
 });
 
-
-/* ---------- LOAD MORE RESULTS (Cursor Pagination) ---------- */
+/* ---------- NEXT (cursor-style pagination from cache) ---------- */
 router.get("/next", (req, res) => {
-  const q = req.query.q?.trim();
-  const cursor = parseInt(req.query.cursor);
-  const limit = parseInt(req.query.limit) || 50;
+  try {
+    const q = (req.query.q || "").trim().toLowerCase();
+    const cursor = parseInt(req.query.cursor) || 0;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 10), 200);
 
-  if (!q || !searchCache.has(q)) {
-    return res.status(400).json({ error: "No cached search found" });
+    if (!q || !searchCache.has(q)) {
+      return res.status(400).json({ error: "No cached search found" });
+    }
+    const entry = searchCache.get(q);
+    const results = entry.results;
+    const slice = results.slice(cursor, cursor + limit);
+    const nextCursor = cursor + slice.length;
+    return res.json({
+      images: slice,
+      nextCursor: nextCursor < results.length ? nextCursor : null,
+      total: results.length,
+    });
+  } catch (err) {
+    console.error("NEXT PAGE ERROR:", err);
+    return res.status(500).json({ error: "Next failed" });
   }
-
-  const entry = searchCache.get(q);
-  const results = entry.results;
-  const nextSlice = results.slice(cursor, cursor + limit);
-  const nextCursor = cursor + nextSlice.length;
-
-  return res.json({
-    images: nextSlice,
-    nextCursor: nextCursor < results.length ? nextCursor : null,
-    total: results.length
-  });
 });
 
 export default router;
