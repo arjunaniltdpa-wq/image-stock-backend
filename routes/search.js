@@ -10,7 +10,7 @@ let cachedDictionary = null;
 const searchCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10min
 const MAX_CACHE_LIMIT = 300;
-const MAX_CANDIDATES = 1200; // fetch at most this many documents to score in Node
+const MAX_CANDIDATES = 0; // 0 = no limit, but handled below
 
 /* Utility: safe tokenizer — keeps small words but preserves important ones */
 function tokenizeQuery(q) {
@@ -241,9 +241,19 @@ router.get("/first", async (req, res) => {
     // (it will be combined later by node scoring)
     const textQuery = { $or: ors };
 
-    const candidates = await Image.find(textQuery)
-      .limit(MAX_CANDIDATES)
-      .lean();
+    const exactOrs = tokens.map(t => ({
+      title: new RegExp(`\\b${t}\\b`, "i")
+    }));
+    // Fetch exact matches FIRST (fast, small set)
+    let candidatesExact = await Image.find({ $or: exactOrs }).lean(); 
+    // Step 2: fallback broad query if needed
+    let candidatesWide = [];
+    if (candidatesExact.length < 200) {
+     // Only fetch wide candidates if exact matches are too few
+     candidatesWide = await Image.find(textQuery).lean();
+    }
+    // Merge both (exact always first)
+    const candidates = [...candidatesExact, ...candidatesWide];
 
     // If candidates are empty and we want typo fallback, build dictionary and find near words
     let finalCandidates = candidates;
