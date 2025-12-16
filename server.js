@@ -113,11 +113,11 @@ app.get("/photo/:slug-:id", async (req, res) => {
   if (isBot) {
     return res.redirect(
       302,
-      `https://api.pixeora.com/api/og?slug=${req.params.slug}-${req.params.id}`
+      `/api/og?slug=${req.params.slug}-${req.params.id}`
     );
   }
 
-  res.sendFile(path.join(__dirname, "public", "download.html"));
+  res.sendFile("download.html", { root: "./public" });
 });
 
 
