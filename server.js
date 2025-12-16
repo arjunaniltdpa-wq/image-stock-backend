@@ -47,6 +47,12 @@ app.use(express.json());
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
+import ogRoute from "./routes/og.js";
+app.use("/og", ogRoute);
+
+app.use("/api/og-meta", ogMetaRoute);
+
+
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
 
