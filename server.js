@@ -43,8 +43,6 @@ app.use(express.json());
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
-import ogRoute from "./routes/og.js";
-app.use("/og", ogRoute);
 
 import ogMetaRoute from "./routes/ogMeta.js";
 app.use("/api/og-meta", ogMetaRoute);

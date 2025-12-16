@@ -1,61 +1,45 @@
 import express from "express";
 import sharp from "sharp";
-import fs from "fs";
-import path from "path";
+import fetch from "node-fetch";
+import Image from "../models/Image.js";
 
 const router = express.Router();
-const OG_DIR = path.join(process.cwd(), "public/og");
 
-/* ----------------------------------
-   OG IMAGE GENERATOR
-   URL: /og/<filename>.jpg
----------------------------------- */
-router.get("/:file", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    let file = req.params.file.replace(/[^a-zA-Z0-9._-]/g, "");
+    const slug = req.query.slug;
+    if (!slug) return res.sendStatus(404);
 
-    // ✅ Force jpg only
-    if (!file.endsWith(".jpg") && !file.endsWith(".jpeg")) {
-      return res.sendStatus(404);
+    // Extract Mongo ID if present
+    const idMatch = slug.match(/([a-f0-9]{24})$/i);
+
+    let image;
+    if (idMatch) {
+      image = await Image.findById(idMatch[1]);
+    } else {
+      image = await Image.findOne({ slug });
     }
 
-    if (!fs.existsSync(OG_DIR)) {
-      fs.mkdirSync(OG_DIR, { recursive: true });
-    }
+    if (!image || !image.fileName) return res.sendStatus(404);
 
-    const ogPath = path.join(OG_DIR, file);
-
-    // ✅ Serve cached OG image
-    if (fs.existsSync(ogPath)) {
-      res.setHeader("Content-Type", "image/jpeg");
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      return fs.createReadStream(ogPath).pipe(res);
-    }
-
-    // ✅ Fallback preview image
-    const originalUrl =
-      file === "preview.jpg"
-        ? "https://cdn.pixeora.com/preview.jpg"
-        : `https://cdn.pixeora.com/${encodeURIComponent(file)}`;
+    const originalUrl = `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
     const response = await fetch(originalUrl);
     if (!response.ok) return res.sendStatus(404);
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = await response.buffer();
 
     const ogBuffer = await sharp(buffer)
       .resize(1200, 630, { fit: "cover", position: "center" })
       .jpeg({ quality: 82 })
       .toBuffer();
 
-    fs.writeFileSync(ogPath, ogBuffer);
-
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.send(ogBuffer);
 
   } catch (err) {
-    console.error("OG ERROR:", err);
+    console.error("OG error:", err);
     res.sendStatus(500);
   }
 });
