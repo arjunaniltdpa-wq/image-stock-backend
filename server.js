@@ -11,11 +11,7 @@ import imageRoutes from "./routes/imageRoutes.js";
 import Image from "./models/Image.js";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
-import fetch from "node-fetch";
-import FormData from "form-data";
 import { fileURLToPath } from "url";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
 import mime from "mime";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
@@ -50,7 +46,9 @@ app.use("/api/search", searchRoutes);
 import ogRoute from "./routes/og.js";
 app.use("/og", ogRoute);
 
+import ogMetaRoute from "./routes/ogMeta.js";
 app.use("/api/og-meta", ogMetaRoute);
+
 
 
 // Multer memory storage
