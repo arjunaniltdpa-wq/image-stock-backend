@@ -36,27 +36,27 @@ dotenv.config();
 // Express app
 const app = express();
 
-app.use(express.static(path.join(__dirname, "public")));
-
-
 // Middleware
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
+// 🔥 1️⃣ OG PAGE — MUST BE FIRST
+import ogPage from "./routes/ogPage.js";
+app.use("/photo", ogPage);
+
+// 🔥 2️⃣ OG IMAGE GENERATOR
+import ogRoute from "./routes/og.js";
+app.use("/api/og", ogRoute);
+
+// 3️⃣ Other APIs
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
-import ogPage from "./routes/ogPage.js";   // ✅ ADD THIS
-app.use("/photo", ogPage);   // FIRST
+app.use("/api/images", imageRoutes);
 
-import ogMetaRoute from "./routes/ogMeta.js";
-import ogRoute from "./routes/og.js";
+// 🔥 4️⃣ STATIC FILES — MUST BE LAST
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use("/api/og-meta", ogMetaRoute);
-app.use("/api/og", ogRoute);
-
-
-app.use("/api/images", imageRoutes); // AFTER
 
 
 // Multer memory storage

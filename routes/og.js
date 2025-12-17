@@ -16,7 +16,10 @@ router.get("/", async (req, res) => {
       ? await Image.findById(idMatch[1]).lean()
       : await Image.findOne({ slug }).lean();
 
-    if (!image || !image.fileName) return res.sendStatus(404);
+    if (!image || !image.fileName) {
+      return res.redirect("https://pixeora.com/images/logo.png");
+    }
+
 
     const src = image.thumbnailFileName
       ? `https://cdn.pixeora.com/${encodeURIComponent(image.thumbnailFileName)}`
@@ -27,8 +30,9 @@ router.get("/", async (req, res) => {
     // 🚨 VERY IMPORTANT
     if (!r.ok) {
       console.error("OG fetch failed:", r.status, src);
-      return res.sendStatus(404);
+      return res.redirect("https://pixeora.com/images/logo.png");
     }
+
 
     const buffer = Buffer.from(await r.arrayBuffer());
 
