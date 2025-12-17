@@ -46,7 +46,7 @@ app.use(express.json());
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
-
+import ogPage from "./routes/ogPage.js";
 import ogMetaRoute from "./routes/ogMeta.js";
 import ogRoute from "./routes/og.js";
 
