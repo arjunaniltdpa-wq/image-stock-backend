@@ -7,37 +7,39 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const slug = req.query.slug;
+    const { slug } = req.query;
     if (!slug) return res.sendStatus(404);
 
-    const image = await Image.findOne({ slug }).lean();
+    // find by slug OR slug-id
+    const idMatch = slug.match(/([a-f0-9]{24})$/i);
+    const image = idMatch
+      ? await Image.findById(idMatch[1]).lean()
+      : await Image.findOne({ slug }).lean();
+
     if (!image || !image.fileName) return res.sendStatus(404);
 
-    const originalUrl =
+    const src =
       image.thumbnailUrl ||
       `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
-    const response = await fetch(originalUrl);
-    if (!response.ok) return res.sendStatus(404);
+    const r = await fetch(src);
+    if (!r.ok) return res.sendStatus(404);
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = await r.buffer();
 
-    const ogBuffer = await sharp(buffer)
+    const og = await sharp(buffer)
       .resize(1200, 630, { fit: "cover", position: "center" })
       .jpeg({ quality: 82 })
       .toBuffer();
 
     res.setHeader("Content-Type", "image/jpeg");
-    res.setHeader(
-      "Cache-Control",
-      "public, max-age=31536000, immutable"
-    );
-    res.status(200).end(ogBuffer);
-  } catch (err) {
-    console.error("OG image error:", err);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.status(200).send(og);
+
+  } catch (e) {
+    console.error("OG IMAGE ERROR:", e);
     res.sendStatus(500);
   }
 });
 
-export default router;
+export default router; // 🔴 THIS WAS MISSING

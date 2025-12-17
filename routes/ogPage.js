@@ -3,74 +3,42 @@ import Image from "../models/Image.js";
 
 const router = express.Router();
 
-router.get("/photo/:slug", async (req, res) => {
-  try {
-    const ua = req.headers["user-agent"] || "";
+router.get("/:slug", async (req, res) => {
+  const { slug } = req.params;
 
-    const isBot =
-      /facebookexternalhit|facebookcatalog|Facebot|MetaInspector|Twitterbot|Pinterestbot|Pinterest|Slackbot|WhatsApp|LinkedInBot|TelegramBot/i.test(
-        ua
-      );
+  const idMatch = slug.match(/([a-f0-9]{24})$/i);
+  const img = idMatch
+    ? await Image.findById(idMatch[1]).lean()
+    : await Image.findOne({ slug }).lean();
 
-    // 🚫 Humans should NOT see OG page
-    if (!isBot) {
-      return res.redirect(302, `/photo/${req.params.slug}`);
-    }
+  if (!img) return res.sendStatus(404);
 
-    const { slug } = req.params;
-    const img = await Image.findOne({ slug }).lean();
-    if (!img) return res.status(404).send("Not found");
+  const title = img.title || "Pixeora Image";
+  const desc = img.description || "Free HD image from Pixeora";
+  const url = `https://pixeora.com/photo/${slug}`;
+  const image = `https://api.pixeora.com/api/og?slug=${encodeURIComponent(slug)}`;
 
-    const title = escapeHtml(img.title || "Free HD Image | Pixeora");
-    const description = escapeHtml(
-      img.description ||
-        "Download free HD wallpapers and royalty-free stock images from Pixeora."
-    );
-
-    const ogImage = `https://api.pixeora.com/api/og?slug=${encodeURIComponent(
-      slug
-    )}`;
-
-    const canonicalUrl = `https://pixeora.com/photo/${slug}`;
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
+  res.send(`<!doctype html>
+<html>
 <head>
 <meta charset="utf-8" />
 <title>${title}</title>
 
-<link rel="canonical" href="${canonicalUrl}" />
+<meta property="og:type" content="article"/>
+<meta property="og:title" content="${title}"/>
+<meta property="og:description" content="${desc}"/>
+<meta property="og:url" content="${url}"/>
+<meta property="og:image" content="${image}"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
 
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="Pixeora" />
-<meta property="og:title" content="${title}" />
-<meta property="og:description" content="${description}" />
-<meta property="og:url" content="${canonicalUrl}" />
-<meta property="og:image" content="${ogImage}" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="${image}"/>
 
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${title}" />
-<meta name="twitter:description" content="${description}" />
-<meta name="twitter:image" content="${ogImage}" />
+<meta http-equiv="refresh" content="0; url=${url}">
 </head>
 <body></body>
-</html>`;
-
-    return res.status(200).send(html);
-  } catch (err) {
-    console.error("OG page error:", err);
-    return res.sendStatus(500);
-  }
+</html>`);
 });
 
 export default router;
-
-function escapeHtml(str = "") {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
