@@ -13,41 +13,31 @@ router.get("/", async (req, res) => {
     const image = await Image.findOne({ slug }).lean();
     if (!image || !image.fileName) return res.sendStatus(404);
 
-    // Prefer thumbnail if exists, else original
     const originalUrl =
       image.thumbnailUrl ||
       `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
     const response = await fetch(originalUrl);
+    if (!response.ok) return res.sendStatus(404);
 
-    if (!response.ok) {
-      console.error("OG fetch failed:", response.status, originalUrl);
-      return res.sendStatus(404);
-    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    const buffer = await response.arrayBuffer();
-    const inputBuffer = Buffer.from(buffer);
-
-    const ogBuffer = await sharp(inputBuffer)
-      .resize(1200, 630, {
-        fit: "cover",
-        position: "center",
-      })
+    const ogBuffer = await sharp(buffer)
+      .resize(1200, 630, { fit: "cover", position: "center" })
       .jpeg({ quality: 82 })
       .toBuffer();
 
-    res.status(200);
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader(
       "Cache-Control",
       "public, max-age=31536000, immutable"
     );
-    res.end(ogBuffer);
+    res.status(200).end(ogBuffer);
   } catch (err) {
     console.error("OG image error:", err);
     res.sendStatus(500);
   }
 });
 
-// 🔴 THIS WAS MISSING BEFORE (CRITICAL)
 export default router;
