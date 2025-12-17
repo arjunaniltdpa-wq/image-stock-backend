@@ -1,36 +1,42 @@
+import express from "express";
+import Image from "../models/Image.js";
+
+const router = express.Router();
+
 router.get("/:slug", async (req, res) => {
-  const ua = (req.headers["user-agent"] || "").toLowerCase();
-  const isBot =
-    ua.includes("facebook") ||
-    ua.includes("twitter") ||
-    ua.includes("pinterest") ||
-    ua.includes("whatsapp") ||
-    ua.includes("linkedin");
+  try {
+    const ua = (req.headers["user-agent"] || "").toLowerCase();
+    const isBot =
+      ua.includes("facebook") ||
+      ua.includes("twitter") ||
+      ua.includes("pinterest") ||
+      ua.includes("whatsapp") ||
+      ua.includes("linkedin");
 
-  if (!isBot) {
-    // HUMAN → FRONTEND
-    return res.sendFile("download.html", { root: "public" });
-  }
+    // ✅ HUMAN → FRONTEND DOWNLOAD PAGE
+    if (!isBot) {
+      return res.sendFile("download.html", { root: "public" });
+    }
 
-  // BOT → OG HTML
-  const raw = req.params.slug;
-  const idMatch = raw.match(/([a-f0-9]{24})$/i);
-  const slug = raw.replace(/-[a-f0-9]{24}$/i, "");
+    // 🤖 BOT → OG PAGE
+    const raw = req.params.slug;
+    const idMatch = raw.match(/([a-f0-9]{24})$/i);
+    const slug = raw.replace(/-[a-f0-9]{24}$/i, "");
 
-  let image = null;
-  if (idMatch) image = await Image.findById(idMatch[1]).lean();
-  if (!image) image = await Image.findOne({ slug }).lean();
+    let image = null;
+    if (idMatch) image = await Image.findById(idMatch[1]).lean();
+    if (!image) image = await Image.findOne({ slug }).lean();
 
-  if (!image) {
-    return res.redirect(302, "https://pixeora.com");
-  }
+    if (!image) {
+      return res.redirect(302, "https://pixeora.com");
+    }
 
-  const ogImage = `https://api.pixeora.com/api/og?slug=${encodeURIComponent(
-    image.slug
-  )}`;
+    const ogImage = `https://api.pixeora.com/api/og?slug=${encodeURIComponent(
+      image.slug
+    )}`;
 
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(`
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`
 <!doctype html>
 <html>
 <head>
@@ -45,5 +51,11 @@ router.get("/:slug", async (req, res) => {
 </head>
 <body></body>
 </html>
-  `);
+    `);
+  } catch (err) {
+    console.error("OG PAGE ERROR:", err);
+    res.redirect(302, "https://pixeora.com");
+  }
 });
+
+export default router;   // 🔥 THIS WAS MISSING
