@@ -48,9 +48,10 @@ app.use("/api/search", searchRoutes);
 
 
 import ogMetaRoute from "./routes/ogMeta.js";
+import ogRoute from "./routes/og.js";
 
 app.use("/api/og-meta", ogMetaRoute);
-
+app.use("/api/og", ogRoute);
 
 import ogPage from "./routes/ogPage.js";
 

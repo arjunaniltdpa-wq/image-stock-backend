@@ -10,22 +10,26 @@ router.get("/", async (req, res) => {
     const { slug } = req.query;
     if (!slug) return res.sendStatus(404);
 
-    // find by slug OR slug-id
+    // Extract Mongo ID if present
     const idMatch = slug.match(/([a-f0-9]{24})$/i);
+
     const image = idMatch
       ? await Image.findById(idMatch[1]).lean()
       : await Image.findOne({ slug }).lean();
 
     if (!image || !image.fileName) return res.sendStatus(404);
 
-    const src =
-      image.thumbnailUrl ||
-      `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
+    // Prefer thumbnail file if exists
+    const src = image.thumbnailFileName
+      ? `https://cdn.pixeora.com/${encodeURIComponent(image.thumbnailFileName)}`
+      : `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
     const r = await fetch(src);
     if (!r.ok) return res.sendStatus(404);
 
-    const buffer = await r.buffer();
+    // node-fetch v3 safe buffer
+    const arrayBuffer = await r.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     const og = await sharp(buffer)
       .resize(1200, 630, { fit: "cover", position: "center" })
@@ -42,4 +46,4 @@ router.get("/", async (req, res) => {
   }
 });
 
-export default router; // 🔴 THIS WAS MISSING
+export default router;
