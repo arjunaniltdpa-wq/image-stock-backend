@@ -1,6 +1,5 @@
 import express from "express";
 import sharp from "sharp";
-import fetch from "node-fetch";
 import Image from "../models/Image.js";
 
 const router = express.Router();
@@ -10,7 +9,7 @@ router.get("/", async (req, res) => {
     const { slug } = req.query;
     if (!slug) return res.sendStatus(404);
 
-    // Extract Mongo ID if present
+    // Match Mongo ObjectId if present
     const idMatch = slug.match(/([a-f0-9]{24})$/i);
 
     const image = idMatch
@@ -19,17 +18,19 @@ router.get("/", async (req, res) => {
 
     if (!image || !image.fileName) return res.sendStatus(404);
 
-    // Prefer thumbnail file if exists
     const src = image.thumbnailFileName
       ? `https://cdn.pixeora.com/${encodeURIComponent(image.thumbnailFileName)}`
       : `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
     const r = await fetch(src);
-    if (!r.ok) return res.sendStatus(404);
 
-    // node-fetch v3 safe buffer
-    const arrayBuffer = await r.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // 🚨 VERY IMPORTANT
+    if (!r.ok) {
+      console.error("OG fetch failed:", r.status, src);
+      return res.sendStatus(404);
+    }
+
+    const buffer = Buffer.from(await r.arrayBuffer());
 
     const og = await sharp(buffer)
       .resize(1200, 630, { fit: "cover", position: "center" })
@@ -40,8 +41,8 @@ router.get("/", async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.status(200).send(og);
 
-  } catch (e) {
-    console.error("OG IMAGE ERROR:", e);
+  } catch (err) {
+    console.error("OG IMAGE ERROR:", err);
     res.sendStatus(500);
   }
 });
