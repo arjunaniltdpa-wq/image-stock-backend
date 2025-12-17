@@ -46,6 +46,14 @@ app.use(express.json());
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
+import ogPage from "./routes/ogPage.js";   // ✅ ADD THIS
+app.use("/photo", ogPage);   // FIRST
+
+import ogMetaRoute from "./routes/ogMeta.js";
+import ogRoute from "./routes/og.js";
+
+app.use("/api/og-meta", ogMetaRoute);
+app.use("/api/og", ogRoute);
 
 
 app.use("/api/images", imageRoutes); // AFTER
