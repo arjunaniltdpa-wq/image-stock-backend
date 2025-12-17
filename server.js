@@ -48,14 +48,14 @@ app.use("/api/search", searchRoutes);
 
 
 import ogMetaRoute from "./routes/ogMeta.js";
-import ogRoute from "./routes/og.js";
 
 app.use("/api/og-meta", ogMetaRoute);
-app.use("/api/og", ogRoute);
 
-import ogPageRoute from "./routes/ogPage.js";
 
-app.use("/", ogPageRoute);
+import ogPage from "./routes/ogPage.js";
+
+app.use("/photo", ogPage);
+
 
 
 // Multer memory storage
