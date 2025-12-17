@@ -17,19 +17,6 @@ import {
 
 const router = express.Router();
 
-function normalizeImage(img) {
-  return {
-    _id: img._id,
-    slug: img.slug,
-    title: img.title,
-    fileName: img.fileName,
-    thumbnailFileName: img.thumbnailFileName,
-    url: buildR2PublicUrl(img.fileName),
-    thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
-  };
-}
-
-
 /* --------------------------------------------
    R2 CLIENT
 -------------------------------------------- */
@@ -344,30 +331,19 @@ router.get("/file/:name", async (req, res) => {
 router.get("/slug/:slugAndId", async (req, res) => {
   try {
     const raw = req.params.slugAndId;
+
+    // ID = last part after last "-"
     const id = raw.split("-").pop();
 
-    if (!/^[a-f0-9]{24}$/i.test(id)) {
-      return res.status(404).json({});
-    }
+    // Fetch using ID (100% accurate)
+    const img = await Image.findById(id);
 
-    const img = await Image.findById(id).lean();
-    if (!img) return res.status(404).json({});
+    if (!img) return res.status(404).json({ error: "Image not found" });
 
-    res.json({
-      _id: img._id,
-      slug: img.slug,
-      title: img.title,
-      description: img.description,
-      fileName: img.fileName,
-      thumbnailFileName: img.thumbnailFileName,
-      tags: img.tags || [],
-      category: img.category || "",
-      url: buildR2PublicUrl(img.fileName),
-      thumbnailUrl: buildR2PublicUrl(img.thumbnailFileName)
-    });
+    res.json(img);
   } catch (err) {
-    console.error("Slug fetch error:", err);
-    res.status(500).json({});
+    console.error("Slug/ID fetch error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
