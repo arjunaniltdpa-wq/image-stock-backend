@@ -53,6 +53,10 @@ import ogRoute from "./routes/og.js";
 app.use("/api/og-meta", ogMetaRoute);
 app.use("/api/og", ogRoute);
 
+import ogPageRoute from "./routes/ogPage.js";
+
+app.use("/", ogPageRoute);
+
 
 // Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
