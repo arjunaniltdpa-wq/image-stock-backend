@@ -46,14 +46,16 @@ app.use(express.json());
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 
-import ogPage from "./routes/ogPage.js";
+import ogPage from "./routes/ogPage.js";   // ✅ ADD THIS
+app.use("/photo", ogPage);   // FIRST
+
 import ogMetaRoute from "./routes/ogMeta.js";
 import ogRoute from "./routes/og.js";
 
 app.use("/api/og-meta", ogMetaRoute);
 app.use("/api/og", ogRoute);
 
-app.use("/photo", ogPage);   // FIRST
+
 app.use("/api/images", imageRoutes); // AFTER
 
 
@@ -100,29 +102,6 @@ app.get("/robots.txt", (req, res) => {
   res.type("text/plain");
   res.sendFile(path.join(__dirname, "robots.txt"));
 });
-
-app.get("/photo/:slug-:id", async (req, res) => {
-  const ua = (req.headers["user-agent"] || "").toLowerCase();
-
-  const isBot =
-    ua.includes("facebookexternalhit") ||
-    ua.includes("twitterbot") ||
-    ua.includes("pinterest") ||
-    ua.includes("slackbot") ||
-    ua.includes("whatsapp") ||
-    ua.includes("linkedinbot") ||
-    ua.includes("telegrambot");
-
-  if (isBot) {
-    return res.redirect(
-      302,
-      `/api/og?slug=${req.params.slug}-${req.params.id}`
-    );
-  }
-
-  res.sendFile("download.html", { root: "./public" });
-});
-
 
 // Build public R2 URL
 function buildR2PublicUrl(fileName) {
