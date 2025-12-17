@@ -1,17 +1,11 @@
-import express from "express";
-import sharp from "sharp";
-import fetch from "node-fetch";
-import Image from "../models/Image.js";
-
-const router = express.Router();
-
 router.get("/", async (req, res) => {
   try {
     const slug = req.query.slug;
+
     if (!slug) return res.sendStatus(404);
 
-    let image = await Image.findOne({ slug });
-    if (!image) return res.sendStatus(404);
+    const image = await Image.findOne({ slug }).lean();
+    if (!image || !image.fileName) return res.sendStatus(404);
 
     const originalUrl =
       image.thumbnailUrl ||
@@ -28,15 +22,10 @@ router.get("/", async (req, res) => {
       .toBuffer();
 
     res.setHeader("Content-Type", "image/jpeg");
-    res.setHeader(
-      "Cache-Control",
-      "public, max-age=31536000, immutable"
-    );
-    res.send(ogBuffer);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.status(200).send(ogBuffer);
   } catch (err) {
-    console.error("OG error:", err);
+    console.error("OG image error:", err);
     res.sendStatus(500);
   }
 });
-
-export default router;
