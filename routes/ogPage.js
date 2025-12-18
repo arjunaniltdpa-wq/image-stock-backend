@@ -15,7 +15,9 @@ router.get("/:slug", async (req, res) => {
     if (!image) image = await Image.findOne({ slug: cleanSlug }).lean();
     if (!image) return res.redirect("https://pixeora.com");
 
-    const ogImage = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
+    // 🔥 OG images
+    const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${image.slug}-${image._id}`;
+    const ogDefault = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
 
     res.status(200).send(`<!doctype html>
 <html lang="en">
@@ -29,11 +31,23 @@ router.get("/:slug", async (req, res) => {
 <meta property="og:url" content="https://pixeora.com/photo/${raw}">
 <meta property="og:title" content="${image.title}">
 <meta property="og:description" content="${image.description || ""}">
-<meta property="og:image" content="${ogImage}">
+
+<!-- 🔥 PINTEREST FIRST -->
+<meta property="og:image" content="${ogPinterest}">
+<meta property="og:image:width" content="1000">
+<meta property="og:image:height" content="1500">
+<meta property="og:image:type" content="image/jpeg">
+
+<!-- 🔥 FACEBOOK / TWITTER FALLBACK -->
+<meta property="og:image" content="${ogDefault}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
 
 <meta name="twitter:card" content="summary_large_image">
+
+<!-- Optional but recommended -->
+<meta property="fb:app_id" content="1234567890">
 
 <script>
   window.location.replace("/download.html?slug=${raw}");
@@ -41,6 +55,7 @@ router.get("/:slug", async (req, res) => {
 </head>
 <body></body>
 </html>`);
+
   } catch (err) {
     console.error("OG PAGE ERROR:", err);
     res.redirect("https://pixeora.com");

@@ -29,24 +29,22 @@ router.get("/", async (req, res) => {
 
     const buffer = Buffer.from(await r.arrayBuffer());
 
+    // 🔥 PINTEREST SIZE (2:3)
     const og = await sharp(buffer)
-      .resize(1200, 630, { fit: "cover", position: "center" })
-      .jpeg({ quality: 82 })
+      .resize(1000, 1500, { fit: "cover", position: "center" })
+      .jpeg({ quality: 90 })
       .toBuffer();
 
-    // VERY IMPORTANT: disable any transformations
     res.status(200);
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.setHeader("Content-Length", og.length);
-
-    // 🚫 Prevent any proxy tampering
     res.setHeader("X-Content-Type-Options", "nosniff");
 
     res.end(og);
 
   } catch (err) {
-    console.error("OG IMAGE ERROR:", err);
+    console.error("PINTEREST OG ERROR:", err);
     res.redirect("https://pixeora.com/images/logo.png");
   }
 });
