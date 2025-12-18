@@ -34,9 +34,16 @@ router.get("/", async (req, res) => {
       .jpeg({ quality: 82 })
       .toBuffer();
 
+    // VERY IMPORTANT: disable any transformations
+    res.status(200);
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    res.status(200).send(og);
+    res.setHeader("Content-Length", og.length);
+
+    // 🚫 Prevent any proxy tampering
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    res.end(og);
 
   } catch (err) {
     console.error("OG IMAGE ERROR:", err);
