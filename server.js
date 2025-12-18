@@ -36,25 +36,24 @@ dotenv.config();
 // Express app
 const app = express();
 
-// Middleware
-app.use(cors({ origin: "*" }));
-app.use(express.json());
-
-// 🔥 1️⃣ OG PAGE — MUST BE FIRST
+// 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
 app.use("/photo", ogPage);
 
-// 🔥 2️⃣ OG IMAGE GENERATOR
+// 🔥 2️⃣ OG IMAGE (optional)
 import ogRoute from "./routes/og.js";
 app.use("/api/og", ogRoute);
 
-// 3️⃣ Other APIs
+// 3️⃣ Middleware (AFTER OG)
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+
+// 4️⃣ APIs
 import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
-
 app.use("/api/images", imageRoutes);
 
-// 🔥 4️⃣ STATIC FILES — MUST BE LAST
+// 5️⃣ STATIC — ALWAYS LAST
 app.use(express.static(path.join(__dirname, "public")));
 
 

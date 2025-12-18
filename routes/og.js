@@ -1,6 +1,7 @@
 import express from "express";
 import sharp from "sharp";
 import Image from "../models/Image.js";
+import fetch from "node-fetch";
 
 const router = express.Router();
 
@@ -9,7 +10,6 @@ router.get("/", async (req, res) => {
     const { slug } = req.query;
     if (!slug) return res.sendStatus(404);
 
-    // Match Mongo ObjectId if present
     const idMatch = slug.match(/([a-f0-9]{24})$/i);
 
     const image = idMatch
@@ -20,19 +20,12 @@ router.get("/", async (req, res) => {
       return res.redirect("https://pixeora.com/images/logo.png");
     }
 
-
     const src = image.thumbnailFileName
       ? `https://cdn.pixeora.com/${encodeURIComponent(image.thumbnailFileName)}`
       : `https://cdn.pixeora.com/${encodeURIComponent(image.fileName)}`;
 
     const r = await fetch(src);
-
-    // 🚨 VERY IMPORTANT
-    if (!r.ok) {
-      console.error("OG fetch failed:", r.status, src);
-      return res.redirect("https://pixeora.com/images/logo.png");
-    }
-
+    if (!r.ok) throw new Error("Image fetch failed");
 
     const buffer = Buffer.from(await r.arrayBuffer());
 
@@ -47,7 +40,7 @@ router.get("/", async (req, res) => {
 
   } catch (err) {
     console.error("OG IMAGE ERROR:", err);
-    res.sendStatus(500);
+    res.redirect("https://pixeora.com/images/logo.png");
   }
 });
 
