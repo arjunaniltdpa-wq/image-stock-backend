@@ -27,6 +27,8 @@ router.get("/:slug", async (req, res) => {
 
 <meta name="description" content="${image.description || ""}">
 
+<link rel="canonical" href="https://pixeora.com/photo/${raw}">
+
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://pixeora.com/photo/${raw}">
 <meta property="og:title" content="${image.title}">

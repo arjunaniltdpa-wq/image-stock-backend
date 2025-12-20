@@ -44,7 +44,7 @@ router.get("/sitemap.xml", async (req, res) => {
 `;
 
   for (let i = 1; i <= pages; i++) {
-    xml += `    <sitemap><loc>${API_SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
+    xml += `    <sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
   }
 
   xml += `</sitemapindex>`;
