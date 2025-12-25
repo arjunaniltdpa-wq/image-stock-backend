@@ -39,12 +39,12 @@ router.get("/sitemap.xml", async (req, res) => {
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
-    <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
+  <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
+  <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
 `;
 
   for (let i = 1; i <= pages; i++) {
-    xml += `    <sitemap><loc>${SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
+    xml += `  <sitemap><loc>${API_SITE}/sitemap-images-${i}.xml</loc></sitemap>\n`;
   }
 
   xml += `</sitemapindex>`;
