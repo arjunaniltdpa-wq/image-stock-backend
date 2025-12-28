@@ -53,6 +53,7 @@ import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 app.use("/api/images", imageRoutes);
 
+
 // 5️⃣ STATIC — ALWAYS LAST
 app.use(express.static(path.join(__dirname, "public")));
 
