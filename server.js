@@ -36,6 +36,8 @@ dotenv.config();
 // Express app
 const app = express();
 
+
+
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
 app.use("/photo", ogPage);
