@@ -117,27 +117,36 @@ router.get("/sitemap-tools.xml", (req, res) => {
 // DYNAMIC IMAGE SITEMAPS
 // ------------------------
 router.get("/sitemap-images-:page.xml", async (req, res) => {
-  const page = parseInt(req.params.page) || 1;
+  try {
+    const page = parseInt(req.params.page) || 1;
+    const skip = (page - 1) * IMAGES_PER_SITEMAP;
 
-  const images = await Image.find({})
-    .skip((page - 1) * IMAGES_PER_SITEMAP)
-    .limit(IMAGES_PER_SITEMAP);
+    res.header("Content-Type", "application/xml");
 
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Start streaming XML
+    res.write(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset 
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-`;
+`);
 
-  images.forEach(img => {
-    const generatedSlug = slugify(img.slug || img.name);
-    const cleanUrl = `${SITE}/photo/${generatedSlug}-${img._id}`;
-    const fileToShow = encodeURIComponent(img.thumbnailFileName || img.fileName);
-    const title = escapeXML(img.title || img.name || "Free HD Image");
-    const caption = escapeXML(img.description || img.title || "");
-    const lastmod = img.uploadedAt ? new Date(img.uploadedAt).toISOString() : new Date().toISOString();
+    const cursor = Image.find({})
+      .sort({ uploadedAt: -1 })
+      .skip(skip)
+      .limit(IMAGES_PER_SITEMAP)
+      .cursor();
 
-    xml += `
+    for await (const img of cursor) {
+      const generatedSlug = slugify(img.slug || img.name);
+      const cleanUrl = `${SITE}/photo/${generatedSlug}-${img._id}`;
+      const fileToShow = encodeURIComponent(img.thumbnailFileName || img.fileName);
+      const title = escapeXML(img.title || img.name || "Free HD Image");
+      const caption = escapeXML(img.description || img.title || "");
+      const lastmod = img.uploadedAt
+        ? new Date(img.uploadedAt).toISOString()
+        : new Date().toISOString();
+
+      res.write(`
   <url>
     <loc>${cleanUrl}</loc>
     <lastmod>${lastmod}</lastmod>
@@ -150,14 +159,18 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
       <image:caption>${caption}</image:caption>
       <image:license>${SITE}/legal.html</image:license>
     </image:image>
-  </url>`;
-  });
+  </url>`);
+    }
 
-  xml += `
-</urlset>`;
+    res.write(`
+</urlset>`);
 
-  res.header("Content-Type", "application/xml");
-  res.send(xml);
+    res.end();
+
+  } catch (err) {
+    console.error("Sitemap error:", err);
+    res.status(500).end();
+  }
 });
 
 export default router;

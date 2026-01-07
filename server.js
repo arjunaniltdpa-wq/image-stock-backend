@@ -16,7 +16,8 @@ import mime from "mime";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
-
+sharp.concurrency(1);
+sharp.cache(false);
 
 // AWS SDK v3 for Cloudflare R2
 import {
@@ -25,6 +26,15 @@ import {
   GetObjectCommand
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+if (!fs.existsSync("tmp_uploads")) {
+  fs.mkdirSync("tmp_uploads");
+}
+
+const tmpDir = "tmp_uploads";
+fs.readdirSync(tmpDir).forEach(file => {
+  fs.unlinkSync(path.join(tmpDir, file));
+});
 
 // ES Module __dirname setup
 const __filename = fileURLToPath(import.meta.url);
@@ -62,7 +72,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 
 // Multer memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ dest: "tmp_uploads/" });
 
 // ---------------------------
 // MongoDB connection
@@ -169,7 +179,7 @@ async function uploadLocalFolderToR2() {
     const filePath = path.join(BULK_UPLOAD_FOLDER, fileName);
 
     try {
-      const buffer = fs.readFileSync(filePath);
+      const fileStream = fs.createReadStream(filePath);
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
@@ -182,7 +192,7 @@ async function uploadLocalFolderToR2() {
           new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: uniqueName,
-            Body: buffer,
+            Body: fileStream,
             ContentType: contentType,
             CacheControl: "public, max-age=31536000, immutable",
           })
@@ -190,7 +200,7 @@ async function uploadLocalFolderToR2() {
       });
 
       // Create thumbnail
-      const thumbBuffer = await sharp(buffer)
+      const thumbBuffer = await sharp(filePath)
         .resize({ width: 400 })
         .jpeg({ quality: 70 })
         .toBuffer();
@@ -209,7 +219,7 @@ async function uploadLocalFolderToR2() {
           })
         );
       });
-
+      
       const seo = generateSEOFromFilename(fileName);
 
       // Save metadata to MongoDB with retry + fallback if fails
@@ -274,17 +284,20 @@ app.use("/uploads", express.static(localUploadDir));
 // ---------------------------
 app.post("/api/compress", upload.single("image_file"), async (req, res) => {
   try {
-    const buffer = await sharp(req.file.buffer)
+    const output = await sharp(req.file.path)
       .jpeg({ quality: 60 })
       .toBuffer();
-    res.send(buffer);
+
+    fs.unlinkSync(req.file.path);
+    res.send(output);
   } catch (err) {
     res.status(500).json({ message: "Failed", details: err.message });
   }
 });
 
+
 // ---------------------------
-// Conversion API
+// Conversion API (SAFE)
 // ---------------------------
 app.post("/api/convert", upload.single("image_file"), async (req, res) => {
   try {
@@ -295,32 +308,55 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
     if (!valid.includes(format))
       return res.status(400).json({ message: "Invalid format" });
 
+    const filePath = req.file.path;
+
+    // ---------- PDF ----------
     if (format === "pdf") {
       const pdfDoc = await PDFDocument.create();
-      const metadata = await sharp(req.file.buffer).metadata();
+
+      // Read file ONCE (PDF needs buffer)
+      const imageBuffer = await fs.promises.readFile(filePath);
+      const metadata = await sharp(filePath).metadata();
 
       const img =
         metadata.format === "png"
-          ? await pdfDoc.embedPng(req.file.buffer)
-          : await pdfDoc.embedJpg(req.file.buffer);
+          ? await pdfDoc.embedPng(imageBuffer)
+          : await pdfDoc.embedJpg(imageBuffer);
 
       const page = pdfDoc.addPage([img.width, img.height]);
-      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      page.drawImage(img, {
+        x: 0,
+        y: 0,
+        width: img.width,
+        height: img.height,
+      });
 
       const pdfBytes = await pdfDoc.save();
+
+      fs.unlinkSync(filePath); // cleanup
+
       res.setHeader("Content-Type", "application/pdf");
       return res.send(Buffer.from(pdfBytes));
     }
 
-    const converted = await sharp(req.file.buffer)
+    // ---------- IMAGE FORMATS ----------
+    const converted = await sharp(filePath)
       .toFormat(format)
       .toBuffer();
+
+    fs.unlinkSync(filePath); // cleanup
 
     res.setHeader("Content-Type", mime.getType(format));
     res.send(converted);
 
   } catch (err) {
-    res.status(500).json({ message: "Conversion failed", details: err.message });
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({
+      message: "Conversion failed",
+      details: err.message,
+    });
   }
 });
 
@@ -334,7 +370,7 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     }
 
     const originalName = req.file.originalname;
-    const buffer = req.file.buffer;
+    const filePath = req.file.path;
 
     // Create unique filename
     const uniqueName = `${Date.now()}-${originalName}`;
@@ -349,7 +385,7 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: uniqueName,
-          Body: buffer,
+          Body: fs.createReadStream(filePath),
           ContentType: contentType,
           CacheControl: "public, max-age=31536000, immutable",
         })
@@ -357,10 +393,11 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     });
 
     // ---- Generate thumbnail ----
-    const thumbBuffer = await sharp(buffer)
+    const thumbBuffer = await sharp(filePath)
       .resize({ width: 400 })
       .jpeg({ quality: 70 })
       .toBuffer();
+
 
     const thumbName = `thumb_${uniqueName}`;
 
@@ -405,6 +442,8 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
       });
       throw err;
     });
+
+    fs.unlinkSync(filePath);
 
     // SUCCESS RESPONSE
     res.json({
