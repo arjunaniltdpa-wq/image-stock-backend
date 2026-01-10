@@ -469,6 +469,35 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
   }
 });
 
+// Real image info size
+
+const IMAGE_DIR = "/var/images"; // your real image folder
+
+app.get("/api/images/slug/:slug", async (req, res) => {
+  const image = await Image.findOne({ slug: req.params.slug });
+
+  if (!image) return res.status(404).json({});
+
+  const filePath = path.join(IMAGE_DIR, image.fileName);
+
+  let fileSize = null;
+  try {
+    const stat = fs.statSync(filePath);
+    fileSize = stat.size; // BYTES
+  } catch (e) {}
+
+  res.json({
+    _id: image._id,
+    title: image.title,
+    fileName: image.fileName,
+    thumbnailFileName: image.thumbnailFileName,
+    size: fileSize, // ✅ ADD THIS
+    width: image.width,
+    height: image.height,
+    keywords: image.keywords
+  });
+});
+
 
 // ---------------------------
 // FINAL ROOT ROUTE
