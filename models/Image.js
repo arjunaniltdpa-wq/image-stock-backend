@@ -1,46 +1,84 @@
 import mongoose from "mongoose";
 
-const imageSchema = new mongoose.Schema({
-  name: String,
-  title: String,
-  fileName: String,
-  thumbnailFileName: String,
-  url: String,
-  thumbnailUrl: String,
-  category: String,
-  secondaryCategory: String,
-  description: String,
-  alt: String,
+const imageSchema = new mongoose.Schema(
+  {
+    name: String,
+    title: String,
 
-  tags: { 
-    type: [String], 
-    default: [] 
+    fileName: {
+      type: String,
+      required: true,
+    },
+
+    thumbnailFileName: String,
+
+    url: String,
+    thumbnailUrl: String,
+
+    category: String,
+    secondaryCategory: String,
+
+    description: String,
+    alt: String,
+
+    // 📏 Exact file size (BYTES)
+    size: {
+      type: Number,
+      default: 0,
+    },
+
+    // 📐 Image dimensions
+    width: Number,
+    height: Number,
+
+    // 📊 Popularity
+    downloads: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
+
+    tags: {
+      type: [String],
+      default: [],
+      index: true,
+    },
+
+    keywords: {
+      type: [String],
+      default: [],
+      index: true,
+    },
+
+    // ⭐ SEO slug (slug + _id makes URL unique)
+    slug: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
+  { versionKey: false }
+);
 
-  keywords: { 
-    type: [String], 
-    default: [] 
-  },
+// --------------------------------------------------
+// INDEXES (DEFINED ONCE — CORRECT WAY)
+// --------------------------------------------------
+imageSchema.index({ downloads: -1, _id: -1 }); // popular + latest
+imageSchema.index({ slug: 1 });
+imageSchema.index({ category: 1 });
+imageSchema.index({ uploadedAt: -1 });
 
-  // ⭐ SEO-friendly slug for clean URLs
-  slug: {
-    type: String,
-    required: true,
-    index: true,
-    unique: false,      // duplicates allowed because ID makes final URL unique
-    lowercase: true,    // auto convert to lowercase
-    trim: true
-  },
-
-  uploadedAt: { 
-    type: Date, 
-    default: Date.now 
-  }
-
-}, { versionKey: false });
-
-
-// ⭐ Automatically ensure slug is lowercase before saving
+// --------------------------------------------------
+// PRE-SAVE HOOKS
+// --------------------------------------------------
 imageSchema.pre("save", function (next) {
   if (this.slug) {
     this.slug = this.slug.toLowerCase().trim();
