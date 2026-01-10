@@ -72,7 +72,6 @@ const imageSchema = new mongoose.Schema(
 // INDEXES (DEFINED ONCE — CORRECT WAY)
 // --------------------------------------------------
 imageSchema.index({ downloads: -1, _id: -1 }); // popular + latest
-imageSchema.index({ slug: 1 });
 imageSchema.index({ category: 1 });
 imageSchema.index({ uploadedAt: -1 });
 
