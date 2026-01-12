@@ -3,47 +3,20 @@ import Image from "../models/Image.js";
 
 const router = express.Router();
 
-const CDN = process.env.R2_PUBLIC_BASE_URL;
-
-// 🔑 SAME helper used everywhere
-function attachUrls(img) {
-  return {
-    ...img,
-    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
-    thumbnailUrl:
-      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
-  };
-}
-
-// POPULAR + LATEST FIRST (SAFE VERSION)
 router.get("/", async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page) || 1, 1);
-
-    // 🔒 HARD LIMIT
-    const limit = Math.min(parseInt(req.query.limit) || 36, 50);
-    const skip = (page - 1) * limit;
-
-    const images = await Image.find({})
-      .select(
-        "title fileName thumbnailFileName url thumbnailUrl downloads width height keywords"
-      )
-      .sort({ downloads: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const images = await Image.find({}).limit(5).lean();
 
     return res.json({
-      page,
-      limit,
+      ok: true,
       count: images.length,
-      images: images.map(attachUrls) // 🔥 FIX
+      sample: images[0] || null
     });
 
   } catch (err) {
-    console.error("POPULAR-LATEST ERROR:", err);
+    console.error("POPULAR DEBUG ERROR:", err);
     return res.status(500).json({
-      error: "Failed to load popular images"
+      error: err.message
     });
   }
 });
