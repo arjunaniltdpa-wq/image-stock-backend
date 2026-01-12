@@ -17,6 +17,18 @@ import {
 
 const router = express.Router();
 
+const CDN = process.env.R2_PUBLIC_BASE_URL;
+
+function withUrls(img) {
+  return {
+    ...img,
+    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
+    thumbnailUrl:
+      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
+  };
+}
+
+
 /* --------------------------------------------
    R2 CLIENT
 -------------------------------------------- */
@@ -331,16 +343,18 @@ router.get("/file/:name", async (req, res) => {
 router.get("/slug/:slugAndId", async (req, res) => {
   try {
     const raw = req.params.slugAndId;
-
-    // ID = last part after last "-"
     const id = raw.split("-").pop();
 
-    // Fetch using ID (100% accurate)
-    const img = await Image.findById(id);
-
+    const img = await Image.findById(id).lean();
     if (!img) return res.status(404).json({ error: "Image not found" });
 
-    res.json(img);
+    res.json({
+      ...img,
+      url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
+      thumbnailUrl:
+        img.thumbnailUrl ||
+        `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
+    });
   } catch (err) {
     console.error("Slug/ID fetch error:", err);
     res.status(500).json({ error: "Server error" });

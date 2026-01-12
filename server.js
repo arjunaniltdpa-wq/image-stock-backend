@@ -501,15 +501,23 @@
 
   app.get("/api/images/slug/:slug", async (req, res) => {
     const image = await Image.findOne({ slug: req.params.slug }).lean();
-
     if (!image) return res.status(404).json({});
+
+    const base = process.env.R2_PUBLIC_BASE_URL;
 
     res.json({
       _id: image._id,
       title: image.title,
       fileName: image.fileName,
       thumbnailFileName: image.thumbnailFileName,
-      size: image.size,      // ✅ FROM DB
+
+      // 🔥 RESTORED (OLD BEHAVIOR)
+      url: image.url || `${base}/${encodeURIComponent(image.fileName)}`,
+      thumbnailUrl:
+        image.thumbnailUrl ||
+        `${base}/${encodeURIComponent(image.thumbnailFileName)}`,
+
+      size: image.size,
       width: image.width,
       height: image.height,
       keywords: image.keywords

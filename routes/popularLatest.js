@@ -3,6 +3,17 @@ import Image from "../models/Image.js";
 
 const router = express.Router();
 
+const CDN = process.env.R2_PUBLIC_BASE_URL;
+
+function withUrls(img) {
+  return {
+    ...img,
+    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
+    thumbnailUrl:
+      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
+  };
+}
+
 // POPULAR + LATEST FIRST (SAFE VERSION)
 router.get("/", async (req, res) => {
   try {
@@ -30,7 +41,7 @@ router.get("/", async (req, res) => {
       page,
       limit,
       count: images.length,
-      images
+      images: images.map(withUrls)
     });
 
   } catch (err) {

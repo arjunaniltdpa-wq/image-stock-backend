@@ -5,6 +5,17 @@ dotenv.config();
 
 const router = express.Router();
 
+const CDN = process.env.R2_PUBLIC_BASE_URL;
+
+function withUrls(img) {
+  return {
+    ...img,
+    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
+    thumbnailUrl:
+      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
+  };
+}
+
 // Cache dictionary once (for typo fallback) + search cache
 let cachedDictionary = null;
 const searchCache = new Map();
@@ -323,7 +334,11 @@ router.get("/first", async (req, res) => {
         ...img,
         thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
         thumbnailUrl: (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/?$/, "/") + encodeURIComponent(img.thumbnailFileName || `thumb_${img.fileName}`),
-        fileUrl: (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/?$/, "/") + encodeURIComponent(img.fileName),
+        url:
+          (process.env.R2_PUBLIC_BASE_URL || "")
+            .replace(/\/?$/, "/") +
+          encodeURIComponent(img.fileName),
+
       });
     }
 
