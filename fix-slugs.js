@@ -1,21 +1,24 @@
 import mongoose from "mongoose";
+import dotenv from "dotenv";
 import Image from "./models/Image.js";
 
-await mongoose.connect(process.env.MONGO_URI);
+dotenv.config();
 
-const images = await Image.find({
-  $or: [{ slug: null }, { slug: "undefined" }]
-});
+await mongoose.connect(process.env.MONGO_URI);
+console.log("✅ MongoDB connected");
+
+const images = await Image.find({});
+console.log(`🔍 Fixing ${images.length} images`);
 
 for (const img of images) {
-  const base = img.title || img.fileName || `image-${img._id}`;
-  img.slug = base
+  const base = (img.title || img.fileName || "image")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+  img.slug = `${base}-${img._id.toString()}`;
   await img.save();
 }
 
-console.log("✅ Slugs fixed");
-process.exit();
+console.log("✅ Slugs rebuilt correctly");
+process.exit(0);
