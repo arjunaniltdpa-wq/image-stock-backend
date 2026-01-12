@@ -228,10 +228,17 @@
         // ---------- SEO ----------
         const seo = generateSEOFromFilename(fileName);
 
-        const slug = seo.slug || seo.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
+        const safeTitle =
+          seo?.slug ||
+          seo?.title ||
+          path.parse(fileName).name ||
+          `image-${Date.now()}`;
+
+        const slug = safeTitle
+          .toString()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "");
 
         const meta = await sharp(filePath).metadata();
 
@@ -420,11 +427,18 @@
 
       const seo = generateSEOFromFilename(originalName);
 
-      const slug = seo.slug || seo.title
+      const safeTitle =
+        seo?.slug ||
+        seo?.title ||
+        path.parse(originalName).name ||
+        `image-${Date.now()}`;
+
+      const slug = safeTitle
+        .toString()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
-      
+
       const meta = await sharp(filePath).metadata();
 
       // ---- Save to MongoDB (retry + fallback) ----
