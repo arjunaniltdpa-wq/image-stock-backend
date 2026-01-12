@@ -17,18 +17,6 @@ import {
 
 const router = express.Router();
 
-const CDN = process.env.R2_PUBLIC_BASE_URL;
-
-function withUrls(img) {
-  return {
-    ...img,
-    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
-    thumbnailUrl:
-      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
-  };
-}
-
-
 /* --------------------------------------------
    R2 CLIENT
 -------------------------------------------- */
@@ -49,6 +37,15 @@ function buildR2PublicUrl(fileName) {
   let base = process.env.R2_PUBLIC_BASE_URL || "";
   if (!base.endsWith("/")) base += "/";
   return `${base}${encodeURIComponent(fileName)}`;
+}
+
+function attachUrls(img) {
+  return {
+    ...img,
+    url: img.url || buildR2PublicUrl(img.fileName),
+    thumbnailUrl:
+      img.thumbnailUrl || buildR2PublicUrl(img.thumbnailFileName)
+  };
 }
 
 /* --------------------------------------------
@@ -112,7 +109,11 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       uploadedAt: new Date()
     });
 
-    res.status(201).json({ message: "Uploaded successfully", image: img });
+  res.status(201).json({
+    message: "Uploaded successfully",
+    image: attachUrls(img.toObject())
+  });
+
   } catch (err) {
     console.error("❌ Upload Error:", err);
     res.status(500).json({ error: "Upload failed" });
@@ -128,7 +129,7 @@ router.get("/popular", async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const images = await Image.find()
+    const images = await Image.find().lean()
       .sort({ uploadedAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -345,16 +346,10 @@ router.get("/slug/:slugAndId", async (req, res) => {
     const raw = req.params.slugAndId;
     const id = raw.split("-").pop();
 
-    const img = await Image.findById(id).lean();
+    const img = await Image.findById(id);
     if (!img) return res.status(404).json({ error: "Image not found" });
 
-    res.json({
-      ...img,
-      url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
-      thumbnailUrl:
-        img.thumbnailUrl ||
-        `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
-    });
+    res.json(attachUrls(img.toObject()));
   } catch (err) {
     console.error("Slug/ID fetch error:", err);
     res.status(500).json({ error: "Server error" });

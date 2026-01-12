@@ -5,23 +5,27 @@ dotenv.config();
 
 const router = express.Router();
 
-const CDN = process.env.R2_PUBLIC_BASE_URL;
-
-function withUrls(img) {
-  return {
-    ...img,
-    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
-    thumbnailUrl:
-      img.thumbnailUrl || `${CDN}/${encodeURIComponent(img.thumbnailFileName)}`
-  };
-}
-
 // Cache dictionary once (for typo fallback) + search cache
 let cachedDictionary = null;
 const searchCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10min
 const MAX_CACHE_LIMIT = 300;
 const MAX_CANDIDATES = 0; // 0 = no limit, but handled below
+const CDN = process.env.R2_PUBLIC_BASE_URL;
+
+function attachUrls(img) {
+  return {
+    ...img,
+    url: img.url || `${CDN}/${encodeURIComponent(img.fileName)}`,
+    thumbnailUrl:
+      img.thumbnailUrl ||
+      `${CDN}/${encodeURIComponent(img.thumbnailFileName || `thumb_${img.fileName}`)}`
+  };
+}
+
+if (!CDN) {
+  console.warn("⚠️ R2_PUBLIC_BASE_URL is missing");
+}
 
 /* Utility: safe tokenizer — keeps small words but preserves important ones */
 function tokenizeQuery(q) {
@@ -330,16 +334,12 @@ router.get("/first", async (req, res) => {
       const id = img._id.toString();
       if (seen.has(id)) continue;
       seen.add(id);
-      final.push({
-        ...img,
-        thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`,
-        thumbnailUrl: (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/?$/, "/") + encodeURIComponent(img.thumbnailFileName || `thumb_${img.fileName}`),
-        url:
-          (process.env.R2_PUBLIC_BASE_URL || "")
-            .replace(/\/?$/, "/") +
-          encodeURIComponent(img.fileName),
-
-      });
+      final.push(
+        attachUrls({
+          ...img,
+          thumbnailFileName: img.thumbnailFileName || `thumb_${img.fileName}`
+        })
+      );
     }
 
     // cache top results
@@ -372,7 +372,7 @@ router.get("/next", (req, res) => {
     }
     const entry = searchCache.get(q);
     const results = entry.results;
-    const slice = results.slice(cursor, cursor + limit);
+    const slice = results.slice(cursor, cursor + limit).map(attachUrls);
     const nextCursor = cursor + slice.length;
     return res.json({
       images: slice,
