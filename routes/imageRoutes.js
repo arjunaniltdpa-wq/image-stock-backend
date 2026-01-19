@@ -179,24 +179,19 @@ router.get("/slug/:slugAndId", async (req, res) => {
    DOWNLOAD (R2 REDIRECT)
 -------------------------------------------- */
 router.get("/download/:filename", (req, res) => {
-  const { filename } = req.params;
+  const filename = req.params.filename;
 
-  if (!filename) {
-    return res.status(400).json({ error: "Filename required" });
+  if (!filename || filename.includes("..") || filename.includes("/")) {
+    return res.status(400).json({ error: "Invalid filename" });
   }
 
   let base = process.env.R2_PUBLIC_BASE_URL;
   if (!base.endsWith("/")) base += "/";
 
-  const r2Url = `${base}${filename}`;
-
-  // Force download instead of open
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${filename}"`
-  );
+  const r2Url = `${base}${filename}?response-content-disposition=attachment`;
 
   return res.redirect(r2Url);
 });
+
 
 export default router;
