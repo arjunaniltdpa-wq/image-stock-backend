@@ -176,21 +176,40 @@ router.get("/slug/:slugAndId", async (req, res) => {
 });
 
 /* --------------------------------------------
-   DOWNLOAD (R2 REDIRECT)
+   FORCE DOWNLOAD (STREAM FROM R2)
 -------------------------------------------- */
-router.get("/download/:filename", (req, res) => {
-  const filename = req.params.filename;
+router.get("/download/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
 
-  if (!filename || filename.includes("..") || filename.includes("/")) {
-    return res.status(400).json({ error: "Invalid filename" });
+    if (!filename || filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: filename,
+    });
+
+    const data = await s3Client.send(command);
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`
+    );
+
+    res.setHeader(
+      "Content-Type",
+      data.ContentType || "application/octet-stream"
+    );
+
+    // 🔥 THIS IS THE KEY LINE
+    data.Body.pipe(res);
+
+  } catch (err) {
+    console.error("DOWNLOAD ERROR:", err.message);
+    res.status(404).json({ error: "File not found" });
   }
-
-  let base = process.env.R2_PUBLIC_BASE_URL;
-  if (!base.endsWith("/")) base += "/";
-
-  const r2Url = `${base}${filename}?response-content-disposition=attachment`;
-
-  return res.redirect(r2Url);
 });
 
 
