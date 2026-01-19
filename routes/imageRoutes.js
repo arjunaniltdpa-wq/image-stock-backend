@@ -175,4 +175,28 @@ router.get("/slug/:slugAndId", async (req, res) => {
   res.json(attachUrls(img));
 });
 
+/* --------------------------------------------
+   DOWNLOAD (R2 REDIRECT)
+-------------------------------------------- */
+router.get("/download/:filename", (req, res) => {
+  const { filename } = req.params;
+
+  if (!filename) {
+    return res.status(400).json({ error: "Filename required" });
+  }
+
+  let base = process.env.R2_PUBLIC_BASE_URL;
+  if (!base.endsWith("/")) base += "/";
+
+  const r2Url = `${base}${filename}`;
+
+  // Force download instead of open
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filename}"`
+  );
+
+  return res.redirect(r2Url);
+});
+
 export default router;
