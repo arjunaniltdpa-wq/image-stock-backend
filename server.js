@@ -183,14 +183,12 @@ async function uploadLocalFolderToR2() {
     const filePath = path.join(BULK_UPLOAD_FOLDER, fileName);
 
     try {
-      // 📏 Get exact file size ONCE
       const stat = fs.statSync(filePath);
-      const fileSize = stat.size; // BYTES
+      const fileSize = stat.size;
 
       const ext = path.extname(fileName).slice(1);
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Unique names
       const safeOriginalName = fileName
         .toLowerCase()
         .replace(/\s+/g, "-")
@@ -198,8 +196,9 @@ async function uploadLocalFolderToR2() {
 
       const uniqueName = `${Date.now()}-${safeOriginalName}`;
       const thumbName = `thumb_${uniqueName}`;
+      const previewName = `preview_${uniqueName.replace(/\.(jpg|jpeg|png)$/i, ".webp")}`;
 
-      // ---------- Upload ORIGINAL ----------
+      // ---------------- ORIGINAL ----------------
       await retry(() =>
         s3Client.send(
           new PutObjectCommand({
@@ -212,73 +211,81 @@ async function uploadLocalFolderToR2() {
         )
       );
 
-      // ---------- Create THUMBNAIL ----------
-      const thumbPath = path.join(tmpDir, `${thumbName}.jpg`);
+      // ---------------- THUMB ----------------
+        const thumbPath = path.join(tmpDir, thumbName);
 
+        await sharp(filePath)
+          .resize({ width: 400 })
+          .webp({ quality: 75 })
+          .toFile(thumbPath);
+
+        await retry(() =>
+          s3Client.send(
+            new PutObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME,
+              Key: thumbName,
+              Body: fs.createReadStream(thumbPath),
+              ContentType: "image/webp",
+              CacheControl: "public, max-age=31536000, immutable",
+            })
+          )
+        );
+
+        fs.unlinkSync(thumbPath);
+
+      // ---------------- PREVIEW (WEBP) ----------------
+      const previewPath = path.join(tmpDir, previewName);
       await sharp(filePath)
-        .resize({ width: 400 })
-        .jpeg({ quality: 70 })
-        .toFile(thumbPath);
+        .resize({ width: 1200 })
+        .webp({ quality: 80 })
+        .toFile(previewPath);
 
-      // ---------- Upload THUMBNAIL ----------
       await retry(() =>
         s3Client.send(
           new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
-            Key: thumbName,
-            Body: fs.createReadStream(thumbPath),
-            ContentType: "image/jpeg",
+            Key: previewName,
+            Body: fs.createReadStream(previewPath),
+            ContentType: "image/webp",
             CacheControl: "public, max-age=31536000, immutable",
           })
         )
       );
+      fs.unlinkSync(previewPath);
 
-      fs.unlinkSync(thumbPath);
-
-      // ---------- SEO ----------
+      // ---------------- SEO + DB ----------------
       const seo = generateSEOFromFilename(fileName);
-      const baseSlug =
-        seo.slug ||
-        seo.title ||
-        path.parse(fileName).name ||
-        `image-${Date.now()}`;
-
-      const slug = baseSlug
+      const slug = (seo.slug || uniqueName)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
 
       const meta = await sharp(filePath).metadata();
 
-      // ---------- SAVE TO MONGODB ----------
-      await retry(() =>
-        Image.create({
-          name: seo.title,
-          title: seo.title,
-          fileName: uniqueName,
-          slug, // ✅ FIXED
-          thumbnailFileName: thumbName,
-          url: buildR2PublicUrl(uniqueName),
-          thumbnailUrl: buildR2PublicUrl(thumbName),
-          category: seo.category,
-          secondaryCategory: seo.secondaryCategory,
-          tags: seo.tags,
-          keywords: seo.keywords,
-          description: seo.description,
-          alt: seo.alt,
-          size: fileSize, // ✅ EXACT FILE SIZE STORED
-          uploadedAt: new Date(),
-          width: meta.width,
-          height: meta.height,
-        })
-      );
+      await Image.create({
+        title: seo.title,
+        slug,
+        fileName: uniqueName,
+        thumbnailFileName: thumbName,
+        previewFileName: previewName,
+        url: buildR2PublicUrl(uniqueName),
+        thumbnailUrl: buildR2PublicUrl(thumbName),
+        previewUrl: buildR2PublicUrl(previewName),
+        size: fileSize,
+        width: meta.width,
+        height: meta.height,
+        tags: seo.tags,
+        keywords: seo.keywords,
+        description: seo.description,
+        alt: seo.alt,
+        uploadedAt: new Date(),
+      });
 
       fs.unlinkSync(filePath);
       console.log(`✅ Uploaded: ${uniqueName}`);
 
     } catch (err) {
       console.error("❌ Bulk Upload Error:", err.message);
-
       writeFallbackLog("failed_uploads.json", {
         file: fileName,
         error: err.message,
@@ -375,9 +382,8 @@ app.post("/api/convert", upload.single("image_file"), async (req, res) => {
     });
   }
 });
-
 // ---------------------------
-// SINGLE IMAGE UPLOAD TO R2
+// SINGLE IMAGE UPLOAD TO R2 (MATCH BULK)
 // ---------------------------
 app.post("/api/upload", upload.single("image"), async (req, res) => {
   try {
@@ -388,22 +394,21 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     const originalName = req.file.originalname;
     const filePath = req.file.path;
 
-    // Create unique filename
     const safeOriginalName = originalName
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9.\-]/g, "");
 
     const uniqueName = `${Date.now()}-${safeOriginalName}`;
+    const thumbName = `thumb_${uniqueName}`;
+    const previewName = `preview_${uniqueName.replace(/\.(jpg|jpeg|png)$/i, ".webp")}`;
 
-
-    // Detect content type
     const ext = path.extname(originalName).slice(1).toLowerCase();
     const contentType = mime.getType(ext) || "application/octet-stream";
 
-    // ---- Upload to R2 with Retry ----
-    await retry(async () => {
-      return await s3Client.send(
+    // ---------- ORIGINAL ----------
+    await retry(() =>
+      s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: uniqueName,
@@ -411,100 +416,94 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
           ContentType: contentType,
           CacheControl: "public, max-age=31536000, immutable",
         })
-      );
-    });
+      )
+    );
 
-    // ---- Generate thumbnail ----
-    const thumbBuffer = await sharp(filePath)
+    // ---------- THUMB (WEBP 400px) ----------
+    const thumbPath = path.join(tmpDir, thumbName);
+    await sharp(filePath)
       .resize({ width: 400 })
-      .jpeg({ quality: 70 })
-      .toBuffer();
+      .webp({ quality: 75 })
+      .toFile(thumbPath);
 
-    const thumbName = `thumb_${uniqueName}`;
-
-    // ---- Upload thumbnail with retry ----
-    await retry(async () => {
-      return await s3Client.send(
+    await retry(() =>
+      s3Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: thumbName,
-          Body: thumbBuffer,
-          ContentType: "image/jpeg",
+          Body: fs.createReadStream(thumbPath),
+          ContentType: "image/webp",
           CacheControl: "public, max-age=31536000, immutable",
         })
-      );
-    });
+      )
+    );
+    fs.unlinkSync(thumbPath);
 
+    // ---------- PREVIEW (WEBP 1200px) ----------
+    const previewPath = path.join(tmpDir, previewName);
+    await sharp(filePath)
+      .resize({ width: 1200 })
+      .webp({ quality: 80 })
+      .toFile(previewPath);
+
+    await retry(() =>
+      s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: previewName,
+          Body: fs.createReadStream(previewPath),
+          ContentType: "image/webp",
+          CacheControl: "public, max-age=31536000, immutable",
+        })
+      )
+    );
+    fs.unlinkSync(previewPath);
+
+    // ---------- META ----------
     const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-
     const seo = generateSEOFromFilename(originalName);
+    const meta = await sharp(filePath).metadata();
 
-    const baseSlug =
-      seo.slug ||
-      seo.title ||
-      path.parse(originalName).name ||
-      `image-${Date.now()}`;
-
-    const slug = baseSlug
+    const slug = (seo.slug || uniqueName)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    const meta = await sharp(filePath).metadata();
-
-    // ---- Save to MongoDB (retry + fallback) ----
-    await retry(async () => {
-      return await Image.create({
-        name: seo.title,
-        title: seo.title,
-        slug, // ✅ REQUIRED
-        fileName: uniqueName,
-        thumbnailFileName: thumbName,
-        url: buildR2PublicUrl(uniqueName),
-        thumbnailUrl: buildR2PublicUrl(thumbName),
-        category: seo.category,
-        secondaryCategory: seo.secondaryCategory,
-        tags: seo.tags,
-        keywords: seo.keywords,
-        size: fileSize,
-        description: seo.description,
-        alt: seo.alt,
-        width: meta.width,
-        height: meta.height,
-    uploadedAt: new Date(),
-      });
-    }).catch(err => {
-      writeFallbackLog("mongo_fallback.json", {
-        file: uniqueName,
-        error: err.message,
-        time: new Date(),
-      });
-      throw err;
+    // ---------- SAVE DB ----------
+    await Image.create({
+      title: seo.title,
+      slug,
+      fileName: uniqueName,
+      thumbnailFileName: thumbName,
+      previewFileName: previewName,
+      url: buildR2PublicUrl(uniqueName),
+      thumbnailUrl: buildR2PublicUrl(thumbName),
+      previewUrl: buildR2PublicUrl(previewName),
+      size: stat.size,
+      width: meta.width,
+      height: meta.height,
+      tags: seo.tags,
+      keywords: seo.keywords,
+      description: seo.description,
+      alt: seo.alt,
+      uploadedAt: new Date(),
     });
 
     fs.unlinkSync(filePath);
 
-    // SUCCESS RESPONSE
     res.json({
       success: true,
       url: buildR2PublicUrl(uniqueName),
       thumbnailUrl: buildR2PublicUrl(thumbName),
+      previewUrl: buildR2PublicUrl(previewName),
     });
 
   } catch (err) {
     console.error("Single Upload Error:", err.message);
-
-    writeFallbackLog("failed_uploads.json", {
-      file: req.file?.originalname,
-      error: err.message,
-      time: new Date(),
-    });
-
     return res.status(500).json({
       success: false,
       message: "Upload failed",
-      error: err.message
+      error: err.message,
     });
   }
 });

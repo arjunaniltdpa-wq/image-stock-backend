@@ -76,73 +76,99 @@ async function uploadAll() {
 
   console.log(`🖼️ Found ${files.length} images.`);
 
-  for (const filePath of files) {
+    for (const filePath of files) {
     const originalName = path.basename(filePath);
-    const uniqueName = `${Date.now()}-${originalName}`;
+    const uniqueBase = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${path.parse(originalName).name}`;
 
     try {
       const buffer = fs.readFileSync(filePath);
-      const ext = path.extname(originalName).slice(1);
+      const ext = path.extname(originalName).slice(1).toLowerCase();
       const contentType = mime.getType(ext) || "application/octet-stream";
 
-      // Upload main image
+      /* ---------------- ORIGINAL IMAGE ---------------- */
+      const originalKey = `${uniqueBase}.${ext}`;
+
       await s2Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
-          Key: uniqueName,
+          Key: originalKey,
           Body: buffer,
           ContentType: contentType,
           CacheControl: "public, max-age=31536000, immutable"
         })
       );
 
-      // Thumbnail
+      /* ---------------- WEBP THUMB (400px) ---------------- */
       const thumbBuffer = await sharp(buffer)
         .resize({ width: 400 })
-        .jpeg({ quality: 70 })
+        .webp({ quality: 75 })
         .toBuffer();
 
-      const thumbName = `thumb_${uniqueName}`;
+      const thumbKey = `${uniqueBase}_thumb.webp`;
 
       await s2Client.send(
         new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
-          Key: thumbName,
+          Key: thumbKey,
           Body: thumbBuffer,
-          ContentType: "image/jpeg",
+          ContentType: "image/webp",
           CacheControl: "public, max-age=31536000, immutable"
         })
       );
 
-      // Generate SEO (includes slug)
-      const seo = generateSEOFromFilename(originalName);
+      /* ---------------- WEBP PREVIEW (1200px) ---------------- */
+      const previewBuffer = await sharp(buffer)
+        .resize({ width: 1200 })
+        .webp({ quality: 85 })
+        .toBuffer();
 
-      // Save to MongoDB (FULL FIELDS + SLUG)
+      const previewKey = `${uniqueBase}_preview.webp`;
+
+      await s2Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: previewKey,
+          Body: previewBuffer,
+          ContentType: "image/webp",
+          CacheControl: "public, max-age=31536000, immutable"
+        })
+      );
+
+      /* ---------------- SEO ---------------- */
+      const seo = generateSEOFromFilename(originalName);
+      const meta = await sharp(buffer).metadata();
+
+      /* ---------------- SAVE TO MONGODB ---------------- */
       await Image.create({
-        name: seo.title,
         title: seo.title,
-        fileName: uniqueName,
-        thumbnailFileName: thumbName,
-        url: buildR2PublicUrl(uniqueName),
-        thumbnailUrl: buildR2PublicUrl(thumbName),
+        slug: seo.slug ? `${seo.slug}-${Date.now()}` : uniqueBase,
+
+        fileName: originalKey,
+        thumbnailFileName: thumbKey,
+        previewFileName: previewKey,
+
+        url: buildR2PublicUrl(originalKey),
+        thumbnailUrl: buildR2PublicUrl(thumbKey),
+        previewUrl: buildR2PublicUrl(previewKey),
+
         category: seo.category,
         secondaryCategory: seo.secondaryCategory,
         description: seo.description,
         alt: seo.alt,
         tags: seo.tags,
         keywords: seo.keywords,
-        slug: seo.slug,                        // ⭐ CORRECT SLUG
+
         uploadedAt: new Date()
       });
 
       fs.unlinkSync(filePath);
-      console.log(`✅ Uploaded: ${uniqueName}`);
-
+      console.log(`✅ Uploaded: ${originalKey}`);
+      
     } catch (err) {
       console.error(`❌ Upload failed: ${originalName}`, err);
     }
   }
-
+  
   console.log("🎉 Bulk upload complete!");
   process.exit(0);
 }
