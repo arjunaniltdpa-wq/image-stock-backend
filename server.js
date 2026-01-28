@@ -531,20 +531,31 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
 });
 
 // Real image info size
-
 app.get("/api/images/slug/:slug", async (req, res) => {
   const image = await Image.findOne({ slug: req.params.slug }).lean();
-
   if (!image) return res.status(404).json({});
 
   res.json({
     _id: image._id,
     title: image.title,
+    slug: image.slug,
+
     fileName: image.fileName,
     thumbnailFileName: image.thumbnailFileName,
-    size: image.size,      // ✅ FROM DB
+    previewFileName: image.previewFileName,
+
+    url: image.url,
+    thumbnailUrl: image.thumbnailUrl,
+    previewUrl: image.previewUrl,
+
+    size: image.size,
     width: image.width,
     height: image.height,
+
+    description: image.description,
+    alt: image.alt,
+    category: image.category,
+    tags: image.tags,
     keywords: image.keywords
   });
 });
