@@ -81,6 +81,7 @@ async function uploadAll() {
     const uniqueBase = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${path.parse(originalName).name}`;
 
     try {
+      // only use buffer for original upload if needed
       const buffer = fs.readFileSync(filePath);
       const ext = path.extname(originalName).slice(1).toLowerCase();
       const contentType = mime.getType(ext) || "application/octet-stream";
@@ -99,8 +100,12 @@ async function uploadAll() {
       );
 
       /* ---------------- WEBP THUMB (400px) ---------------- */
-      const thumbBuffer = await sharp(buffer)
-        .resize({ width: 400 })
+      const thumbBuffer = await sharp(filePath)
+        .rotate() // ✅ fixes EXIF orientation
+        .resize({
+          width: 400,
+          withoutEnlargement: true
+        })
         .webp({ quality: 75 })
         .toBuffer();
 
@@ -117,8 +122,12 @@ async function uploadAll() {
       );
 
       /* ---------------- WEBP PREVIEW (1200px) ---------------- */
-      const previewBuffer = await sharp(buffer)
-        .resize({ width: 1200 })
+      const previewBuffer = await sharp(filePath)
+        .rotate() // ✅ fixes EXIF orientation
+        .resize({
+          width: 1200,
+          withoutEnlargement: true
+        })
         .webp({ quality: 85 })
         .toBuffer();
 
@@ -136,12 +145,12 @@ async function uploadAll() {
 
       /* ---------------- SEO ---------------- */
       const seo = generateSEOFromFilename(originalName);
-      const meta = await sharp(buffer).metadata();
+      const meta = await sharp(filePath).metadata();
 
       /* ---------------- SAVE TO MONGODB ---------------- */
-      await Image.create({
+      const doc = await Image.create({
         title: seo.title,
-        slug: seo.slug ? `${seo.slug}-${Date.now()}` : uniqueBase,
+        slug: seo.slug || uniqueBase, // safe fallback
 
         fileName: originalKey,
         thumbnailFileName: thumbKey,
@@ -161,9 +170,15 @@ async function uploadAll() {
         uploadedAt: new Date()
       });
 
+      // FINAL slug update
+      doc.slug = `${doc.slug}-${doc._id}`;
+      await doc.save();
+
+      // delete only after everything succeeded
       fs.unlinkSync(filePath);
+
       console.log(`✅ Uploaded: ${originalKey}`);
-      
+
     } catch (err) {
       console.error(`❌ Upload failed: ${originalName}`, err);
     }

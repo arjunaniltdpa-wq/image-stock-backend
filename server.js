@@ -215,7 +215,11 @@ async function uploadLocalFolderToR2() {
         const thumbPath = path.join(tmpDir, thumbName);
 
         await sharp(filePath)
-          .resize({ width: 400 })
+          .rotate() // 🔥 fixes portrait/landscape EXIF issues
+          .resize({
+            width: 400,
+            withoutEnlargement: true
+          })
           .webp({ quality: 75 })
           .toFile(thumbPath);
 
@@ -236,7 +240,11 @@ async function uploadLocalFolderToR2() {
       // ---------------- PREVIEW (WEBP) ----------------
       const previewPath = path.join(tmpDir, previewName);
       await sharp(filePath)
-        .resize({ width: 1200 })
+        .rotate()
+        .resize({
+          width: 1200,
+          withoutEnlargement: true
+        })
         .webp({ quality: 80 })
         .toFile(previewPath);
 
@@ -262,7 +270,7 @@ async function uploadLocalFolderToR2() {
 
       const meta = await sharp(filePath).metadata();
 
-      await Image.create({
+      const doc = await Image.create({
         title: seo.title,
         slug,
         fileName: uniqueName,
@@ -280,6 +288,9 @@ async function uploadLocalFolderToR2() {
         alt: seo.alt,
         uploadedAt: new Date(),
       });
+
+      doc.slug = `${slug}-${doc._id}`;
+      await doc.save();
 
       fs.unlinkSync(filePath);
       console.log(`✅ Uploaded: ${uniqueName}`);
@@ -422,7 +433,11 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     // ---------- THUMB (WEBP 400px) ----------
     const thumbPath = path.join(tmpDir, thumbName);
     await sharp(filePath)
-      .resize({ width: 400 })
+      .rotate() // 🔥 fixes portrait/landscape EXIF issues
+      .resize({
+        width: 400,
+        withoutEnlargement: true
+      })
       .webp({ quality: 75 })
       .toFile(thumbPath);
 
@@ -442,7 +457,11 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     // ---------- PREVIEW (WEBP 1200px) ----------
     const previewPath = path.join(tmpDir, previewName);
     await sharp(filePath)
-      .resize({ width: 1200 })
+      .rotate()
+      .resize({
+        width: 1200,
+        withoutEnlargement: true
+      })
       .webp({ quality: 80 })
       .toFile(previewPath);
 
@@ -470,7 +489,7 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
       .replace(/(^-|-$)/g, "");
 
     // ---------- SAVE DB ----------
-    await Image.create({
+    const doc = await Image.create({
       title: seo.title,
       slug,
       fileName: uniqueName,
@@ -488,6 +507,9 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
       alt: seo.alt,
       uploadedAt: new Date(),
     });
+
+    doc.slug = `${slug}-${doc._id}`;
+    await doc.save();
 
     fs.unlinkSync(filePath);
 
