@@ -12,6 +12,9 @@ import Image from "./models/Image.js";
 
 dotenv.config();
 
+sharp.concurrency(2);
+sharp.cache(false);
+
 // -------------------------------------------------
 // 1️⃣ Config
 // -------------------------------------------------

@@ -11,10 +11,12 @@ const imageSchema = new mongoose.Schema(
     },
 
     thumbnailFileName: String,
+    previewFileName: String,   // ✅ ADD
 
     url: String,
     thumbnailUrl: String,
-
+    previewUrl: String,
+    
     category: String,
     secondaryCategory: String,
 
