@@ -47,18 +47,6 @@ dotenv.config();
 // Express app
 const app = express();
 
-// 🔒 FIX DUPLICATE PHOTO URL (slug-id-id → slug-id)
-app.get("/photo/:slug-:id-:dup", (req, res, next) => {
-  const { slug, id, dup } = req.params;
-
-  // Only when ID is duplicated
-  if (id === dup) {
-    return res.redirect(301, `/photo/${slug}-${id}`);
-  }
-
-  // Otherwise continue normally
-  next();
-});
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
