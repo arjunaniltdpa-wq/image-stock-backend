@@ -63,6 +63,30 @@ app.get("/api/images/resolve-slug/:slug", async (req, res) => {
   res.json({ slug: image.slug });
 });
 
+// 1️⃣ FIX slug-id-id → slug-id
+app.get(/^\/photo\/(.+)-([a-f0-9]{24})-\2$/, (req, res) => {
+  const slug = req.params[0];
+  const id = req.params[1];
+  return res.redirect(301, `/photo/${slug}-${id}`);
+});
+
+// 2️⃣ FIX slug WITHOUT ID → slug-ID
+app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
+  const baseSlug = req.params[0];
+
+  if (baseSlug.match(/[a-f0-9]{24}$/i)) {
+    return next(); // already canonical
+  }
+
+  const image = await Image.findOne({
+    slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
+  }).select("slug");
+
+  if (!image) return next();
+
+  return res.redirect(301, `/photo/${image.slug}`);
+});
+
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";

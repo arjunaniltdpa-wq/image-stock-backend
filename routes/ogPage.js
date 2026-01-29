@@ -51,9 +51,6 @@ router.get("/:slug", async (req, res) => {
 <!-- Optional but recommended -->
 <meta property="fb:app_id" content="1234567890">
 
-<script>
-  window.location.replace("/download.html?slug=${raw}");
-</script>
 </head>
 <body></body>
 </html>`);
