@@ -1,31 +1,10 @@
 import express from "express";
 import Image from "../models/Image.js";
-import path from "path";
 
 const router = express.Router();
 
 router.get("/:slug", async (req, res) => {
   try {
-    const ua = (req.headers["user-agent"] || "").toLowerCase();
-
-    const isBot =
-      ua.includes("googlebot") ||
-      ua.includes("bingbot") ||
-      ua.includes("facebook") ||
-      ua.includes("twitter") ||
-      ua.includes("pinterest") ||
-      ua.includes("linkedin") ||
-      ua.includes("whatsapp") ||
-      ua.includes("slack");
-
-    // 👉 HUMANS GET FRONTEND
-    if (!isBot) {
-      return res.sendFile(
-        path.join(process.cwd(), "public", "download.html")
-      );
-    }
-
-    // 👉 BOTS GET OG HTML
     const raw = req.params.slug;
 
     const idMatch = raw.match(/([a-f0-9]{24})$/i);
@@ -36,6 +15,7 @@ router.get("/:slug", async (req, res) => {
     if (!image) image = await Image.findOne({ slug: cleanSlug }).lean();
     if (!image) return res.redirect("https://pixeora.com");
 
+    // 🔥 OG images
     const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${image.slug}-${image._id}`;
     const ogDefault = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
 
@@ -46,25 +26,38 @@ router.get("/:slug", async (req, res) => {
 <title>${image.title}</title>
 
 <meta name="description" content="${image.description || ""}">
-<link rel="canonical" href="https://pixeora.com/photo/${image.slug}-${image._id}">
+
+<link rel="canonical" href="https://pixeora.com/photo/${raw}">
 
 <meta property="og:type" content="article">
-<meta property="og:url" content="https://pixeora.com/photo/${image.slug}-${image._id}">
+<meta property="og:url" content="https://pixeora.com/photo/${raw}">
 <meta property="og:title" content="${image.title}">
 <meta property="og:description" content="${image.description || ""}">
 
+<!-- 🔥 PINTEREST FIRST -->
 <meta property="og:image" content="${ogPinterest}">
 <meta property="og:image:width" content="1000">
 <meta property="og:image:height" content="1500">
+<meta property="og:image:type" content="image/jpeg">
 
+<!-- 🔥 FACEBOOK / TWITTER FALLBACK -->
 <meta property="og:image" content="${ogDefault}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
 
 <meta name="twitter:card" content="summary_large_image">
+
+<!-- Optional but recommended -->
+<meta property="fb:app_id" content="1234567890">
+
+<script>
+  window.location.replace("/download.html?slug=${raw}");
+</script>
 </head>
 <body></body>
 </html>`);
+
   } catch (err) {
     console.error("OG PAGE ERROR:", err);
     res.redirect("https://pixeora.com");
