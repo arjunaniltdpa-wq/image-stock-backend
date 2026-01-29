@@ -47,40 +47,36 @@ dotenv.config();
 // Express app
 const app = express();
 
-// 1️⃣ FIX duplicate ID → slug-id-id → slug-id
-app.get(
-  "/photo/:slug-:id([a-f0-9]{24})-:dup([a-f0-9]{24})",
-  (req, res, next) => {
-    const { slug, id, dup } = req.params;
+// 1️⃣ FIX slug-id-id → slug-id (RegExp route)
+app.get(/^\/photo\/(.+)-([a-f0-9]{24})-\2$/, (req, res) => {
+  const slug = req.params[0];
+  const id = req.params[1];
 
-    if (id === dup) {
-      return res.redirect(301, `/photo/${slug}-${id}`);
-    }
-
-    next();
-  }
-);
+  return res.redirect(301, `/photo/${slug}-${id}`);
+});
 
 // 2️⃣ FIX slug WITHOUT ID → redirect to slug-ID
-app.get("/photo/:baseSlug([^/]*[^-])", async (req, res, next) => {
-  const { baseSlug } = req.params;
+app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
+  const baseSlug = req.params[0];
 
-  // If it already ends with Mongo ID → skip
+  // Skip if already ends with Mongo ID
   if (baseSlug.match(/[a-f0-9]{24}$/i)) {
     return next();
   }
 
-  const image = await Image.findOne({
-    slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
-  }).select("slug");
+  try {
+    const image = await Image.findOne({
+      slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
+    }).select("slug");
 
-  if (!image) {
-    return next(); // real 404
+    if (!image) return next();
+
+    return res.redirect(301, `/photo/${image.slug}`);
+  } catch (e) {
+    console.error("Slug redirect error:", e.message);
+    return next();
   }
-
-  return res.redirect(301, `/photo/${image.slug}`);
 });
-
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
