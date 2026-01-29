@@ -47,36 +47,22 @@ dotenv.config();
 // Express app
 const app = express();
 
-// 1️⃣ FIX slug-id-id → slug-id (RegExp route)
-app.get(/^\/photo\/(.+)-([a-f0-9]{24})-\2$/, (req, res) => {
-  const slug = req.params[0];
-  const id = req.params[1];
+// Resolve slug WITHOUT ID → return canonical slug-ID
+app.get("/api/images/resolve-slug/:slug", async (req, res) => {
+  const baseSlug = req.params.slug;
 
-  return res.redirect(301, `/photo/${slug}-${id}`);
-});
-
-// 2️⃣ FIX slug WITHOUT ID → redirect to slug-ID
-app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
-  const baseSlug = req.params[0];
-
-  // Skip if already ends with Mongo ID
-  if (baseSlug.match(/[a-f0-9]{24}$/i)) {
-    return next();
+  if (/[a-f0-9]{24}$/i.test(baseSlug)) {
+    return res.json({ slug: baseSlug });
   }
 
-  try {
-    const image = await Image.findOne({
-      slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
-    }).select("slug");
+  const image = await Image.findOne({
+    slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
+  }).select("slug");
 
-    if (!image) return next();
-
-    return res.redirect(301, `/photo/${image.slug}`);
-  } catch (e) {
-    console.error("Slug redirect error:", e.message);
-    return next();
-  }
+  if (!image) return res.status(404).json({});
+  res.json({ slug: image.slug });
 });
+
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
