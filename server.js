@@ -47,6 +47,40 @@ dotenv.config();
 // Express app
 const app = express();
 
+// 1️⃣ FIX duplicate ID → slug-id-id → slug-id
+app.get(
+  "/photo/:slug-:id([a-f0-9]{24})-:dup([a-f0-9]{24})",
+  (req, res, next) => {
+    const { slug, id, dup } = req.params;
+
+    if (id === dup) {
+      return res.redirect(301, `/photo/${slug}-${id}`);
+    }
+
+    next();
+  }
+);
+
+// 2️⃣ FIX slug WITHOUT ID → redirect to slug-ID
+app.get("/photo/:baseSlug([^/]*[^-])", async (req, res, next) => {
+  const { baseSlug } = req.params;
+
+  // If it already ends with Mongo ID → skip
+  if (baseSlug.match(/[a-f0-9]{24}$/i)) {
+    return next();
+  }
+
+  const image = await Image.findOne({
+    slug: new RegExp(`^${baseSlug}-[a-f0-9]{24}$`, "i")
+  }).select("slug");
+
+  if (!image) {
+    return next(); // real 404
+  }
+
+  return res.redirect(301, `/photo/${image.slug}`);
+});
+
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
