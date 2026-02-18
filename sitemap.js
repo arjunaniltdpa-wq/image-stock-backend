@@ -136,31 +136,52 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
       .limit(IMAGES_PER_SITEMAP)
       .cursor();
 
-    for await (const img of cursor) {
-      const generatedSlug = slugify(img.slug || img.name);
-      const cleanUrl = `${SITE}/photo/${generatedSlug}-${img._id}`;
-      const fileToShow = encodeURIComponent(img.thumbnailFileName || img.fileName);
-      const title = escapeXML(img.title || img.name || "Free HD Image");
-      const caption = escapeXML(img.description || img.title || "");
-      const lastmod = img.uploadedAt
-        ? new Date(img.uploadedAt).toISOString()
-        : new Date().toISOString();
+      for await (const img of cursor) {
+        // Use stored slug directly
+        const baseSlug = img.slug || slugify(img.name);
+        const cleanUrl = `${SITE}/photo/${baseSlug}-${img._id}`;
 
-      res.write(`
-  <url>
-    <loc>${cleanUrl}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+        const originalImage = img.fileName
+          ? encodeURIComponent(img.fileName)
+          : null;
 
-    <image:image>
-      <image:loc>${CDN}/${fileToShow}</image:loc>
-      <image:title>${title}</image:title>
-      <image:caption>${caption}</image:caption>
-      <image:license>${SITE}/legal.html</image:license>
-    </image:image>
-  </url>`);
-    }
+        const previewImage = img.previewFileName
+          ? encodeURIComponent(img.previewFileName)
+          : null;
+
+        const thumbImage = img.thumbnailFileName
+          ? encodeURIComponent(img.thumbnailFileName)
+          : null;
+
+        const title = escapeXML(img.title || img.name || "Free HD Image");
+
+        const caption = escapeXML(
+          (img.description || img.title || "Free high resolution stock image from Pixeora").slice(0, 2000)
+        );
+
+        const lastmod = img.uploadedAt
+          ? new Date(img.uploadedAt).toISOString()
+          : new Date().toISOString();
+
+        // PRIORITY: preview > original
+        const bestImage = previewImage || originalImage;
+
+        res.write(`
+          <url>
+            <loc>${cleanUrl}</loc>
+            <lastmod>${lastmod}</lastmod>
+            <changefreq>monthly</changefreq>
+            <priority>0.9</priority>
+
+            <image:image>
+              ${bestImage ? `<image:loc>${CDN}/${bestImage}</image:loc>` : ""}
+              ${thumbImage ? `<image:thumbnail_loc>${CDN}/${thumbImage}</image:thumbnail_loc>` : ""}
+              <image:title>${title}</image:title>
+              <image:caption>${caption}</image:caption>
+              <image:license>${SITE}/legal.html</image:license>
+            </image:image>
+          </url>`);
+      }
 
     res.write(`
 </urlset>`);
