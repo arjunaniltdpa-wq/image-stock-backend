@@ -47,15 +47,6 @@ dotenv.config();
 // Express app
 const app = express();
 
-function escapeHtml(text = "") {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 // Resolve slug WITHOUT ID → return canonical slug-ID
 app.get("/api/images/resolve-slug/:slug", async (req, res) => {
   const baseSlug = req.params.slug;
@@ -96,87 +87,10 @@ app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
   return res.redirect(301, `/photo/${image.slug}`);
 });
 
-app.get("/photo/:slug", async (req, res) => {
-  try {
-    const image = await Image.findOne({ slug: req.params.slug }).lean();
-    if (!image) return res.status(404).send("Image not found");
-
-    const previewUrl = image.previewUrl || image.url;
-    const title = image.title;
-    const description =
-      image.description || `Download ${title} in HD resolution.`;
-
-    const safeTitle = escapeHtml(title);
-    const safeDescription = escapeHtml(description);
-    const safeAlt = escapeHtml(image.alt || title);
-
-    const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="googlebot" content="index, follow, max-image-preview:large">
-
-  <title>${safeTitle} HD Stock Image – Free Download | Pixeora</title>
-  <meta name="description" content="${safeDescription}">
-  <link rel="canonical" href="https://pixeora.com/photo/${image.slug}">
-
-  <link rel="stylesheet" href="/css/download.css">
-  <link rel="stylesheet" href="/css/cookie.css">
-
-  <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
-</head>
-
-<body>
-
-<header class="header">
-  <div class="header-overlay">
-    <a href="/" class="logo">Pixeora</a>
-  </div>
-</header>
-
-<div class="page-wrapper">
-  <main>
-
-    <div class="image-section">
-
-      <div class="protected-wrapper">
-        <img
-          src="${previewUrl}"
-          width="${image.width || 1200}"
-          height="${image.height || 800}"
-          alt="${safeAlt}"
-          loading="eager"
-          style="max-width:100%; height:auto;"
-        />
-      </div>
-
-      <h1>${safeTitle}</h1>
-      <p class="seo-desc">${safeDescription}</p>
-
-    </div>
-
-  </main>
-</div>
-
-</body>
-</html>
-`;
-
-    res.set("Cache-Control", "public, max-age=3600");
-    res.send(html);
-
-  } catch (err) {
-    res.status(500).send("Server error");
-  }
-});
 
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
-app.use("/og-photo", ogPage);
+app.use("/photo", ogPage);
 
 // 🔥 2️⃣ OG IMAGE (optional)
 import ogRoute from "./routes/og.js";
@@ -191,8 +105,11 @@ import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 app.use("/api/images", imageRoutes);
 
+
 // 5️⃣ STATIC — ALWAYS LAST
 app.use(express.static(path.join(__dirname, "public")));
+
+
 
 // Multer memory storage
 const upload = multer({ dest: "tmp_uploads/" });
