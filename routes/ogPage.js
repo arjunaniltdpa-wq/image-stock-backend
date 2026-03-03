@@ -16,10 +16,16 @@ router.get("/:slug", async (req, res) => {
     const raw = req.params.slug;
 
     const idMatch = raw.match(/([a-f0-9]{24})$/i);
-    if (!idMatch) return res.redirect("/");
+    if (!idMatch) {
+      console.log("NO ID MATCH:", raw);
+      return res.status(404).send("No ID match");
+    }
 
     const image = await Image.findById(idMatch[1]).lean();
-    if (!image) return res.redirect("/");
+    if (!image) {
+      console.log("IMAGE NOT FOUND FOR:", idMatch[1]);
+      return res.status(404).send("Image not found");
+    }
 
     const fullSlug = `${image.slug}-${image._id}`;
     const previewUrl = image.previewUrl || image.url;
