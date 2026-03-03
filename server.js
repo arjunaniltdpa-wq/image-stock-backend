@@ -95,6 +95,7 @@ app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
 
   return res.redirect(301, `/photo/${image.slug}`);
 });
+
 app.get("/photo/:slug", async (req, res) => {
   try {
     const image = await Image.findOne({ slug: req.params.slug }).lean();
@@ -102,47 +103,68 @@ app.get("/photo/:slug", async (req, res) => {
 
     const previewUrl = image.previewUrl || image.url;
     const title = image.title;
-    const description = image.description || `Download ${title} in HD resolution.`;
+    const description =
+      image.description || `Download ${title} in HD resolution.`;
+
     const safeTitle = escapeHtml(title);
     const safeDescription = escapeHtml(description);
+    const safeAlt = escapeHtml(image.alt || title);
 
     const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="robots" content="index, follow, max-image-preview:large">
-      <meta name="googlebot" content="index, follow, max-image-preview:large">
-      
-      <title>${safeTitle} HD Stock Image – Free Download | Pixeora</title>
-      <meta name="description" content="${safeDescription}">
-      <link rel="canonical" href="https://pixeora.com/photo/${image.slug}">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-      <meta property="og:title" content="${safeTitle}">
-      <meta property="og:image" content="${previewUrl}">
-      <meta property="og:description" content="${safeDescription}">
-      <meta property="og:type" content="website">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="googlebot" content="index, follow, max-image-preview:large">
 
-      <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "ImageObject",
-        "name": "${safeTitle}",
-        "contentUrl": "${previewUrl}",
-        "thumbnailUrl": "${image.thumbnailUrl}",
-        "description": "${safeDescription}",
-        "width": ${image.width},
-        "height": ${image.height}
-      }
-      </script>
-    </head>
-    <body>
+  <title>${safeTitle} HD Stock Image – Free Download | Pixeora</title>
+  <meta name="description" content="${safeDescription}">
+  <link rel="canonical" href="https://pixeora.com/photo/${image.slug}">
+
+  <link rel="stylesheet" href="/css/download.css">
+  <link rel="stylesheet" href="/css/cookie.css">
+
+  <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
+</head>
+
+<body>
+
+<header class="header">
+  <div class="header-overlay">
+    <a href="/" class="logo">Pixeora</a>
+  </div>
+</header>
+
+<div class="page-wrapper">
+  <main>
+
+    <div class="image-section">
+
+      <div class="protected-wrapper">
+        <img
+          src="${previewUrl}"
+          width="${image.width || 1200}"
+          height="${image.height || 800}"
+          alt="${safeAlt}"
+          loading="eager"
+          style="max-width:100%; height:auto;"
+        />
+      </div>
+
       <h1>${safeTitle}</h1>
-      <img src="${previewUrl}" width="${image.width}" height="${image.height}" alt="${escapeHtml(image.alt || title)}">
-      <p>${safeDescription}</p>
-    </body>
-    </html>
-    `;
+      <p class="seo-desc">${safeDescription}</p>
+
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>
+`;
 
     res.set("Cache-Control", "public, max-age=3600");
     res.send(html);
