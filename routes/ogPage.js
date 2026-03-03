@@ -26,18 +26,18 @@ router.get("/:slug", async (req, res) => {
 
     let html = fs.readFileSync(TEMPLATE_PATH, "utf8");
 
-    // 🔥 Replace TITLE
+    // 🔥 Replace ONLY the main image tag safely
     html = html.replace(
-      /Free HD Stock Image Download \| Pixeora/g,
-      `${image.title} | Free HD Image – Pixeora`
+      /<img\s+id="download-image"[^>]*>/,
+      `<img
+          id="download-image"
+          src="${previewUrl}"
+          alt="${image.title} HD stock image"
+          width="${image.width || 1200}"
+          height="${image.height || 800}"
+          loading="eager"
+          fetchpriority="high">`
     );
-
-    // 🔥 Replace META DESCRIPTION
-    html = html.replace(
-      /Download free high-quality HD and 4K stock images for commercial and personal use./g,
-      image.description || `Download ${image.title} in HD resolution.`
-    );
-
     // 🔥 Inject OG + Canonical
     html = html.replace(
       `<meta name="robots" content="index, follow">`,
