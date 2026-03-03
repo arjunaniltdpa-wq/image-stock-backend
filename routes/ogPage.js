@@ -1,66 +1,71 @@
 import express from "express";
+import fs from "fs";
+import path from "path";
 import Image from "../models/Image.js";
+import { fileURLToPath } from "url";
 
 const router = express.Router();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const TEMPLATE_PATH = path.join(__dirname, "../public/download.html");
 
 router.get("/:slug", async (req, res) => {
   try {
     const raw = req.params.slug;
 
     const idMatch = raw.match(/([a-f0-9]{24})$/i);
-    const cleanSlug = raw.replace(/-[a-f0-9]{24}$/i, "").replace(/-pixeora$/i, "");
+    if (!idMatch) return res.redirect("/");
 
-    let image = null;
-    if (idMatch) image = await Image.findById(idMatch[1]).lean();
-    if (!image) image = await Image.findOne({ slug: cleanSlug }).lean();
-    if (!image) return res.redirect("https://pixeora.com");
+    const image = await Image.findById(idMatch[1]).lean();
+    if (!image) return res.redirect("/");
 
-    // 🔥 OG images
-    const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${image.slug}-${image._id}`;
-    const ogDefault = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
+    const fullSlug = `${image.slug}-${image._id}`;
+    const previewUrl = image.previewUrl || image.url;
 
-    res.status(200).send(`<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${image.title}</title>
+    let html = fs.readFileSync(TEMPLATE_PATH, "utf8");
 
-<meta name="description" content="${image.description || ""}">
+    // 🔥 Replace TITLE
+    html = html.replace(
+      /Free HD Stock Image Download \| Pixeora/g,
+      `${image.title} | Free HD Image – Pixeora`
+    );
 
-<link rel="canonical" href="https://pixeora.com/photo/${raw}">
+    // 🔥 Replace META DESCRIPTION
+    html = html.replace(
+      /Download free high-quality HD and 4K stock images for commercial and personal use./g,
+      image.description || `Download ${image.title} in HD resolution.`
+    );
 
-<meta property="og:type" content="article">
-<meta property="og:url" content="https://pixeora.com/photo/${raw}">
-<meta property="og:title" content="${image.title}">
-<meta property="og:description" content="${image.description || ""}">
+    // 🔥 Inject OG + Canonical
+    html = html.replace(
+      `<meta name="robots" content="index, follow">`,
+      `<meta name="robots" content="index, follow">
+       <meta property="og:title" content="${image.title}">
+       <meta property="og:description" content="${image.description || ""}">
+       <meta property="og:image" content="${previewUrl}">
+       <meta property="og:url" content="https://pixeora.com/photo/${fullSlug}">
+       <link rel="canonical" href="https://pixeora.com/photo/${fullSlug}">`
+    );
 
-<!-- 🔥 PINTEREST FIRST -->
-<meta property="og:image" content="${ogPinterest}">
-<meta property="og:image:width" content="1000">
-<meta property="og:image:height" content="1500">
-<meta property="og:image:type" content="image/jpeg">
+    // 🔥 Inject REAL IMAGE (replace placeholder)
+    html = html.replace(
+      `https://cdn.pixeora.com/seo-placeholder.jpg`,
+      previewUrl
+    );
 
-<!-- 🔥 FACEBOOK / TWITTER FALLBACK -->
-<meta property="og:image" content="${ogDefault}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:type" content="image/jpeg">
+    // 🔥 Inject REAL ALT
+    html = html.replace(
+      `alt="Loading image..."`,
+      `alt="${image.title} HD stock image"`
+    );
 
-<meta name="twitter:card" content="summary_large_image">
-
-<!-- Optional but recommended -->
-<meta property="fb:app_id" content="1234567890">
-
-<script>
-  window.location.replace("/download.html?slug=${raw}");
-</script>
-</head>
-<body></body>
-</html>`);
+    res.status(200).send(html);
 
   } catch (err) {
-    console.error("OG PAGE ERROR:", err);
-    res.redirect("https://pixeora.com");
+    console.error("PHOTO PAGE ERROR:", err);
+    res.redirect("/");
   }
 });
 
