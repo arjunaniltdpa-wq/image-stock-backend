@@ -1,77 +1,66 @@
 import express from "express";
-import fs from "fs";
-import path from "path";
 import Image from "../models/Image.js";
-import { fileURLToPath } from "url";
 
 const router = express.Router();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const TEMPLATE_PATH = path.join(__dirname, "../public/download.html");
 
 router.get("/:slug", async (req, res) => {
   try {
     const raw = req.params.slug;
 
     const idMatch = raw.match(/([a-f0-9]{24})$/i);
-    if (!idMatch) {
-      console.log("NO ID MATCH:", raw);
-      return res.status(404).send("No ID match");
-    }
+    const cleanSlug = raw.replace(/-[a-f0-9]{24}$/i, "").replace(/-pixeora$/i, "");
 
-    const image = await Image.findById(idMatch[1]).lean();
-    if (!image) {
-      console.log("IMAGE NOT FOUND FOR:", idMatch[1]);
-      return res.status(404).send("Image not found");
-    }
+    let image = null;
+    if (idMatch) image = await Image.findById(idMatch[1]).lean();
+    if (!image) image = await Image.findOne({ slug: cleanSlug }).lean();
+    if (!image) return res.redirect("https://pixeora.com");
 
-    const fullSlug = `${image.slug}-${image._id}`;
-    const previewUrl = image.previewUrl || image.url;
+    // 🔥 OG images
+    const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${image.slug}-${image._id}`;
+    const ogDefault = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
 
-    let html = fs.readFileSync(TEMPLATE_PATH, "utf8");
+    res.status(200).send(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${image.title}</title>
 
-    // 🔥 Replace ONLY the main image tag safely
-    html = html.replace(
-      /<img\s+id="download-image"[^>]*>/,
-      `<img
-          id="download-image"
-          src="${previewUrl}"
-          alt="${image.title} HD stock image"
-          width="${image.width || 1200}"
-          height="${image.height || 800}"
-          loading="eager"
-          fetchpriority="high">`
-    );
-    // 🔥 Inject OG + Canonical
-    html = html.replace(
-      `<meta name="robots" content="index, follow">`,
-      `<meta name="robots" content="index, follow">
-       <meta property="og:title" content="${image.title}">
-       <meta property="og:description" content="${image.description || ""}">
-       <meta property="og:image" content="${previewUrl}">
-       <meta property="og:url" content="https://pixeora.com/photo/${fullSlug}">
-       <link rel="canonical" href="https://pixeora.com/photo/${fullSlug}">`
-    );
+<meta name="description" content="${image.description || ""}">
 
-    // 🔥 Inject REAL IMAGE (replace placeholder)
-    html = html.replace(
-      `https://cdn.pixeora.com/seo-placeholder.jpg`,
-      previewUrl
-    );
+<link rel="canonical" href="https://pixeora.com/photo/${raw}">
 
-    // 🔥 Inject REAL ALT
-    html = html.replace(
-      `alt="Loading image..."`,
-      `alt="${image.title} HD stock image"`
-    );
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://pixeora.com/photo/${raw}">
+<meta property="og:title" content="${image.title}">
+<meta property="og:description" content="${image.description || ""}">
 
-    res.status(200).send(html);
+<!-- 🔥 PINTEREST FIRST -->
+<meta property="og:image" content="${ogPinterest}">
+<meta property="og:image:width" content="1000">
+<meta property="og:image:height" content="1500">
+<meta property="og:image:type" content="image/jpeg">
+
+<!-- 🔥 FACEBOOK / TWITTER FALLBACK -->
+<meta property="og:image" content="${ogDefault}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
+
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Optional but recommended -->
+<meta property="fb:app_id" content="1234567890">
+
+<script>
+  window.location.replace("/download.html?slug=${raw}");
+</script>
+</head>
+<body></body>
+</html>`);
 
   } catch (err) {
-    console.error("PHOTO PAGE ERROR:", err);
-    res.redirect("/");
+    console.error("OG PAGE ERROR:", err);
+    res.redirect("https://pixeora.com");
   }
 });
 
