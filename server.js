@@ -105,11 +105,13 @@ import searchRoutes from "./routes/search.js";
 app.use("/api/search", searchRoutes);
 app.use("/api/images", imageRoutes);
 
+app.get("/ads.txt", (req, res) => {
+  res.type("text/plain");
+  res.sendFile(path.join(__dirname, "public", "ads.txt"));
+});
 
 // 5️⃣ STATIC — ALWAYS LAST
 app.use(express.static(path.join(__dirname, "public")));
-
-
 
 // Multer memory storage
 const upload = multer({ dest: "tmp_uploads/" });
