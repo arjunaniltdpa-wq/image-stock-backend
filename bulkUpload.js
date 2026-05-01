@@ -188,8 +188,10 @@ async function uploadAll() {
   }
   
   console.log("🎉 Bulk upload complete!");
+
+  await pingGoogle(); // ✅ CALL BEFORE EXIT
+
   process.exit(0);
-  await pingGoogle();
 }
 
 import axios from "axios";
