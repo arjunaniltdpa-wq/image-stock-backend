@@ -189,6 +189,19 @@ async function uploadAll() {
   
   console.log("🎉 Bulk upload complete!");
   process.exit(0);
+  await pingGoogle();
+}
+
+import axios from "axios";
+
+async function pingGoogle() {
+  try {
+    await axios.get(
+      "https://www.google.com/ping?sitemap=https://pixeora.com/sitemap.xml"
+    );
+  } catch (e) {
+    console.log("Ping failed");
+  }
 }
 
 uploadAll();

@@ -39,8 +39,20 @@ router.get("/sitemap.xml", async (req, res) => {
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>${SITE}/sitemap-static.xml</loc></sitemap>
-  <sitemap><loc>${SITE}/sitemap-tools.xml</loc></sitemap>
+  <sitemap>
+    <loc>${SITE}/sitemap-latest.xml</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+  </sitemap>
+
+  <sitemap>
+    <loc>${SITE}/sitemap-static.xml</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+  </sitemap>
+
+  <sitemap>
+    <loc>${SITE}/sitemap-tools.xml</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+  </sitemap>
 `;
 
   for (let i = 1; i <= pages; i++) {
@@ -58,8 +70,17 @@ router.get("/sitemap.xml", async (req, res) => {
 // STATIC PAGES
 // ------------------------
 router.get("/sitemap-static.xml", (req, res) => {
-  const urls = ["/", "/legal.html", "/search.html"];
-
+  const urls = [
+    "/",
+    "/legal.html",
+    "/search.html",
+    "/search.html?query=latest",
+    "/search.html?query=popular",
+    "/search.html?query=4k",
+    "/search.html?query=wallpaper",
+    "/search.html?query=nature",
+    "/search.html?query=car"
+  ];
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 `;
@@ -79,6 +100,37 @@ router.get("/sitemap-static.xml", (req, res) => {
 
   res.header("Content-Type", "application/xml");
   res.send(xml);
+});
+
+router.get("/sitemap-latest.xml", async (req, res) => {
+  try {
+    const images = await Image.find({})
+      .sort({ updatedAt: -1, uploadedAt: -1 })
+      .limit(500)
+      .lean();
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+
+    images.forEach(img => {
+      const slug = `${img.slug}-${img._id}`;
+      xml += `
+      <url>
+        <loc>https://pixeora.com/photo/${slug}</loc>
+        <lastmod>${new Date(img.updatedAt || img.uploadedAt).toISOString()}</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+      </url>`;
+    });
+
+    xml += `</urlset>`;
+
+    res.header("Content-Type", "application/xml");
+    res.send(xml);
+
+  } catch (err) {
+    res.status(500).send("Error");
+  }
 });
 
 // ------------------------
@@ -119,6 +171,7 @@ router.get("/sitemap-tools.xml", (req, res) => {
 router.get("/sitemap-images-:page.xml", async (req, res) => {
   try {
     const page = parseInt(req.params.page) || 1;
+    const priority = page === 1 ? "1.0" : "0.8";
     const skip = (page - 1) * IMAGES_PER_SITEMAP;
 
     res.header("Content-Type", "application/xml");
@@ -131,7 +184,7 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
 `);
 
     const cursor = Image.find({})
-      .sort({ uploadedAt: -1 })
+      .sort({ updatedAt: -1, uploadedAt: -1 })
       .skip(skip)
       .limit(IMAGES_PER_SITEMAP)
       .cursor();
@@ -159,9 +212,9 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
           (img.description || img.title || "Free high resolution stock image from Pixeora").slice(0, 2000)
         );
 
-        const lastmod = img.uploadedAt
-          ? new Date(img.uploadedAt).toISOString()
-          : new Date().toISOString();
+        const lastmod = new Date(
+          img.updatedAt || img.uploadedAt || Date.now()
+        ).toISOString();
 
         // PRIORITY: preview > original
         const bestImage = previewImage || originalImage;
@@ -170,8 +223,8 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
           <url>
             <loc>${cleanUrl}</loc>
             <lastmod>${lastmod}</lastmod>
-            <changefreq>monthly</changefreq>
-            <priority>0.9</priority>
+            <changefreq>daily</changefreq>
+            <priority>${priority}</priority>
 
             <image:image>
               ${bestImage ? `<image:loc>${CDN}/${bestImage}</image:loc>` : ""}
@@ -184,6 +237,7 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
       }
 
     res.write(`
+    
 </urlset>`);
 
     res.end();

@@ -15,47 +15,109 @@ router.get("/:slug", async (req, res) => {
     if (!image) image = await Image.findOne({ slug: cleanSlug }).lean();
     if (!image) return res.redirect("https://pixeora.com");
 
-    // 🔥 OG images
-    const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${image.slug}-${image._id}`;
-    const ogDefault = `https://pixeora.com/api/og?slug=${image.slug}-${image._id}`;
+    const fullSlug = `${image.slug}-${image._id}`;
+
+    // 🔥 OG IMAGES
+    const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${fullSlug}`;
+    const ogDefault = `https://pixeora.com/api/og?slug=${fullSlug}`;
+
+    // 🔥 IMAGE DIMENSIONS (VERY IMPORTANT)
+    const width = image.width || 1200;
+    const height = image.height || 800;
+
+    // 👉 detect orientation
+    const isPortrait = height > width;
+
+    // 👉 Pinterest prefers vertical → force only if portrait
+    const pinterestWidth = isPortrait ? 1000 : 1200;
+    const pinterestHeight = isPortrait ? 1500 : 630;
+
+    // 🔥 SAFE TEXT
+    const title = image.title || "Free HD Image";
+    const desc = image.description || `Download ${title} in HD quality for free.`;
 
     res.status(200).send(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${image.title}</title>
 
-<meta name="description" content="${image.description || ""}">
+<title>${title}</title>
+<meta name="description" content="${desc}">
 
 <link rel="canonical" href="https://pixeora.com/photo/${raw}">
 
+<meta name="robots" content="index, follow">
+
+<!-- OPEN GRAPH -->
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://pixeora.com/photo/${raw}">
-<meta property="og:title" content="${image.title}">
-<meta property="og:description" content="${image.description || ""}">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
 
-<!-- 🔥 PINTEREST FIRST -->
+<!-- 🔥 PINTEREST IMAGE -->
 <meta property="og:image" content="${ogPinterest}">
-<meta property="og:image:width" content="1000">
-<meta property="og:image:height" content="1500">
+<meta property="og:image:width" content="${pinterestWidth}">
+<meta property="og:image:height" content="${pinterestHeight}">
 <meta property="og:image:type" content="image/jpeg">
 
-<!-- 🔥 FACEBOOK / TWITTER FALLBACK -->
+<!-- 🔥 DEFAULT IMAGE -->
 <meta property="og:image" content="${ogDefault}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="${width}">
+<meta property="og:image:height" content="${height}">
 <meta property="og:image:type" content="image/jpeg">
 
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- Optional but recommended -->
-<meta property="fb:app_id" content="1234567890">
-
-<script>
-  window.location.replace("/download.html?slug=${raw}");
+<!-- 🔥 STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ImageObject",
+  "name": "${title}",
+  "description": "${desc}",
+  "contentUrl": "https://cdn.pixeora.com/${image.previewFileName || image.fileName}",
+  "width": ${width},
+  "height": ${height},
+  "url": "https://pixeora.com/photo/${raw}"
+}
 </script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  text-align: center;
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
+</style>
+
+<!-- ⏳ Delay redirect (VERY IMPORTANT) -->
+<script>
+  setTimeout(function() {
+    window.location.replace("/download.html?slug=${raw}");
+  }, 1200);
+</script>
+
 </head>
-<body></body>
+
+<body>
+
+<h1>${title}</h1>
+
+<img src="https://cdn.pixeora.com/${image.previewFileName || image.fileName}" 
+     alt="${title}" width="800">
+
+<p>${desc}</p>
+
+<p>
+This high-quality image is free for personal and commercial use. 
+Perfect for wallpapers, websites, social media, and creative projects.
+</p>
+
+</body>
 </html>`);
 
   } catch (err) {
