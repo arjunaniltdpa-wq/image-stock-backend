@@ -17,22 +17,17 @@ router.get("/:slug", async (req, res) => {
 
     const fullSlug = `${image.slug}-${image._id}`;
 
-    // 🔥 OG IMAGES
     const ogPinterest = `https://pixeora.com/api/og/pinterest?slug=${fullSlug}`;
     const ogDefault = `https://pixeora.com/api/og?slug=${fullSlug}`;
 
-    // 🔥 IMAGE DIMENSIONS (VERY IMPORTANT)
     const width = image.width || 1200;
     const height = image.height || 800;
 
-    // 👉 detect orientation
     const isPortrait = height > width;
 
-    // 👉 Pinterest prefers vertical → force only if portrait
     const pinterestWidth = isPortrait ? 1000 : 1200;
     const pinterestHeight = isPortrait ? 1500 : 630;
 
-    // 🔥 SAFE TEXT
     const title = image.title || "Free HD Image";
     const desc = image.description || `Download ${title} in HD quality for free.`;
 
@@ -41,26 +36,22 @@ router.get("/:slug", async (req, res) => {
 <head>
 <meta charset="utf-8">
 
-<title>${title}</title>
-<meta name="description" content="${desc}">
+<title>${title} 4K Wallpaper Free Download | Pixeora</title>
+<meta name="description" content="${title} in HD and 4K resolution. Free stock image download for wallpapers, websites, and commercial use.">
 
 <link rel="canonical" href="https://pixeora.com/photo/${raw}">
-
 <meta name="robots" content="index, follow">
 
-<!-- OPEN GRAPH -->
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://pixeora.com/photo/${raw}">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 
-<!-- 🔥 PINTEREST IMAGE -->
 <meta property="og:image" content="${ogPinterest}">
 <meta property="og:image:width" content="${pinterestWidth}">
 <meta property="og:image:height" content="${pinterestHeight}">
 <meta property="og:image:type" content="image/jpeg">
 
-<!-- 🔥 DEFAULT IMAGE -->
 <meta property="og:image" content="${ogDefault}">
 <meta property="og:image:width" content="${width}">
 <meta property="og:image:height" content="${height}">
@@ -68,7 +59,6 @@ router.get("/:slug", async (req, res) => {
 
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- 🔥 STRUCTURED DATA -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -93,11 +83,24 @@ img {
   height: auto;
 }
 </style>
-<script>
-  window.location.replace("/download.html?slug=${raw}");
-</script>
+
 </head>
 
+<body>
+
+<h1>${title}</h1>
+
+<img src="https://cdn.pixeora.com/${image.previewFileName || image.fileName}" 
+     alt="${title}" width="${width}" height="${height}">
+
+<p>${desc}</p>
+
+<p>
+This high-quality image is free for personal and commercial use. 
+Perfect for wallpapers, websites, social media, and creative projects.
+</p>
+
+</body>
 </html>`);
 
   } catch (err) {
