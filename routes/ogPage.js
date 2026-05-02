@@ -93,31 +93,11 @@ img {
   height: auto;
 }
 </style>
-
-<!-- ⏳ Delay redirect (VERY IMPORTANT) -->
 <script>
-  setTimeout(function() {
-    window.location.replace("/download.html?slug=${raw}");
-  }, 1200);
+  window.location.replace("/download.html?slug=${raw}");
 </script>
-
 </head>
 
-<body>
-
-<h1>${title}</h1>
-
-<img src="https://cdn.pixeora.com/${image.previewFileName || image.fileName}" 
-     alt="${title}" width="800">
-
-<p>${desc}</p>
-
-<p>
-This high-quality image is free for personal and commercial use. 
-Perfect for wallpapers, websites, social media, and creative projects.
-</p>
-
-</body>
 </html>`);
 
   } catch (err) {
