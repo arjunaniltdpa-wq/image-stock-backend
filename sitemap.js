@@ -110,7 +110,7 @@ router.get("/sitemap-latest.xml", async (req, res) => {
   try {
     const images = await Image.find({})
       .sort({ updatedAt: -1, uploadedAt: -1 })
-      .limit(500)
+      .limit(1000)
       .lean();
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -193,52 +193,57 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
       .limit(IMAGES_PER_SITEMAP)
       .cursor();
 
-      for await (const img of cursor) {
-        // Use stored slug directly
-        const baseSlug = img.slug || slugify(img.name);
-        const cleanUrl = `${SITE}/photo/${baseSlug}-${img._id}`;
+    for await (const img of cursor) {
 
-        const originalImage = img.fileName
-          ? encodeURIComponent(img.fileName)
-          : null;
+      const baseSlug = img.slug || slugify(img.name);
+      const cleanUrl = `${SITE}/photo/${baseSlug}-${img._id}`;
 
-        const previewImage = img.previewFileName
-          ? encodeURIComponent(img.previewFileName)
-          : null;
+      const originalImage = img.fileName
+        ? encodeURIComponent(img.fileName)
+        : null;
 
-        const thumbImage = img.thumbnailFileName
-          ? encodeURIComponent(img.thumbnailFileName)
-          : null;
+      const previewImage = img.previewFileName
+        ? encodeURIComponent(img.previewFileName)
+        : null;
 
-        const title = escapeXML(img.title || img.name || "Free HD Image");
+      const thumbImage = img.thumbnailFileName
+        ? encodeURIComponent(img.thumbnailFileName)
+        : null;
 
-        const caption = escapeXML(
-          (img.description || img.title || "Free high resolution stock image from Pixeora").slice(0, 2000)
-        );
+      const title = escapeXML(img.title || img.name || "Free HD Image");
 
-        const lastmod = new Date(
-          img.updatedAt || img.uploadedAt || Date.now()
-        ).toISOString();
+      const caption = escapeXML(
+        (img.description || img.title || "Free high resolution stock image from Pixeora").slice(0, 2000)
+      );
 
-        // PRIORITY: preview > original
-        const bestImage = previewImage || originalImage;
+      const lastmod = new Date(
+        img.updatedAt || img.uploadedAt || Date.now()
+      ).toISOString();
 
-        res.write(`
-          <url>
-            <loc>${cleanUrl}</loc>
-            <lastmod>${lastmod}</lastmod>
-            <changefreq>daily</changefreq>
-            <priority>${priority}</priority>
+      // ✅ SAFE PRIORITY (no format forcing)
+      const bestImage = previewImage || originalImage || thumbImage;
 
-            <image:image>
-              ${bestImage ? `<image:loc>${CDN}/${bestImage}</image:loc>` : ""}
-              ${thumbImage ? `<image:thumbnail_loc>${CDN}/${thumbImage}</image:thumbnail_loc>` : ""}
-              <image:title>${title}</image:title>
-              <image:caption>${caption}</image:caption>
-              <image:license>${SITE}/legal.html</image:license>
-            </image:image>
-          </url>`);
-      }
+      const imageUrl = bestImage
+        ? `${CDN}/${bestImage}`
+        : "";
+
+      res.write(`
+        <url>
+          <loc>${cleanUrl}</loc>
+          <lastmod>${lastmod}</lastmod>
+          <changefreq>daily</changefreq>
+          <priority>${priority}</priority>
+
+          <image:image>
+            ${imageUrl ? `<image:loc>${imageUrl}</image:loc>` : ""}
+            ${thumbImage ? `<image:thumbnail_loc>${CDN}/${thumbImage}</image:thumbnail_loc>` : ""}
+            <image:title>${title}</image:title>
+            <image:caption>${caption}</image:caption>
+            <image:license>${SITE}/legal.html</image:license>
+            <image:geo_location>Global</image:geo_location>
+          </image:image>
+        </url>`);
+    }
 
     res.write(`
     
@@ -251,5 +256,4 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
     res.status(500).end();
   }
 });
-
 export default router;
