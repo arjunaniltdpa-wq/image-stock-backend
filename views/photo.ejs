@@ -259,10 +259,15 @@
             >
 
             <img
-                src="https://cdn.pixeora.com/<%= r.thumbnailFileName || r.previewFileName || r.fileName %>"
-                class="image-load image-loaded"
-                alt="<%= r.title %>"
-                loading="lazy"
+              src="<%= r.thumbnailFileName
+                ? `https://cdn.pixeora.com/${r.thumbnailFileName}`
+                : r.previewFileName
+                 ? `https://cdn.pixeora.com/${r.previewFileName}`
+                 : '/images/placeholder.webp'
+              %>"
+              class="image-load image-loaded"
+              alt="<%= r.title %>"
+            loading="lazy"
             >
 
             </a>
@@ -271,8 +276,12 @@
               class="download-overlay"
               onclick="event.stopPropagation(); downloadImage('<%= r.fileName %>')"
               type="button"
+              aria-label="Download image"
             >
-              ↓
+              <img
+                src="/images/download-icon.png"
+                alt="Download"
+              >
             </button>
 
         </div>
