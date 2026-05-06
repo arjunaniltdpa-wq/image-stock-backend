@@ -46,7 +46,11 @@
   <link rel="preload" href="/css/download.css" as="style">
   <link rel="stylesheet" href="/css/download.css">
   <link rel="stylesheet" href="/css/cookie.css">
-
+  <link
+    rel="preload"
+    as="image"
+    href="<%= previewUrl %>">
+    
   <!-- Performance -->
   <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
   <link rel="preconnect" href="https://api.pixeora.com" crossorigin>
@@ -88,7 +92,10 @@
   <script async
     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4549865852809903"
     crossorigin="anonymous"></script>
-
+  <script
+    id="ld-json"
+    type="application/ld+json">
+  </script>
 </head>
 
 <body>
@@ -190,13 +197,14 @@
           <button id="toggleSeo">Show More</button>
         </div>
 
-        <button
-        id="download-link"
-        class="download-btn"
-        onclick="forceDownload('<%= originalUrl %>', '<%= title %>.jpg')"
+        <a
+          id="download-link"
+          class="download-btn"
+          href="<%= originalUrl %>"
+          download="<%= title %>.jpg"
         >
-        <i class="fas fa-download"></i> Download
-        </button>
+          <i class="fas fa-download"></i> Download
+        </a>
 
       </div>
 
@@ -212,23 +220,33 @@
     </div>
 
     <div class="related-wrapper">
+
     <h2>Similar Images</h2>
 
     <div class="seo-links-top">
-    <h3 class="explore-title">Explore More Images</h3>
 
-    <div class="seo-links" id="seo-links-list">
+        <h3 class="explore-title">
+        Explore More Images
+        </h3>
+
+        <div class="seo-links" id="seo-links-list">
         <% related.forEach(r => { %>
-        <a href="/photo/<%= r.slug %>" class="seo-chip">
+
+            <a
+            href="/photo/<%= r.slug %>"
+            class="seo-chip"
+            >
             <%= r.title %>
-        </a>
+            </a>
+
         <% }) %>
+        </div>
+
     </div>
 
+    <!-- REAL RELATED IMAGE GRID -->
     <div id="related-images"></div>
 
-    </div>
-        
     </div>
 
   </main>
