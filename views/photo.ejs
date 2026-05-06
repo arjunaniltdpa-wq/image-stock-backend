@@ -191,13 +191,12 @@
         </div>
 
         <a
-          id="download-link"
-          href="<%= originalUrl %>"
-          download
+        id="download-link"
+        class="download-btn"
+        href="<%= originalUrl %>?download=1"
+        download="<%= title %>.jpg"
         >
-          <button class="download-btn">
-            <i class="fas fa-download"></i> Download
-          </button>
+        <i class="fas fa-download"></i> Download
         </a>
 
       </div>

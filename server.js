@@ -90,7 +90,6 @@ app.get(/^\/photo\/([^\/-]+(?:-[^\/-]+)*)$/, async (req, res, next) => {
   return res.redirect(301, `/photo/${image.slug}`);
 });
 
-
 // 🔥 1️⃣ OG PAGE — ABSOLUTELY FIRST
 import ogPage from "./routes/ogPage.js";
 app.use("/photo", ogPage);
