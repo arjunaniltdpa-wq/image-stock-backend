@@ -50,6 +50,8 @@
     rel="preload"
     as="image"
     href="<%= previewUrl %>">
+
+  <link rel="image_src" href="<%= previewUrl %>">
     
   <!-- Performance -->
   <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
@@ -71,7 +73,7 @@
     "@type":"ImageObject",
     "name":"<%= title %>",
     "description":"<%= desc %>",
-    "contentUrl":"<%= originalUrl %>",
+    "contentUrl":"<%= previewUrl %>",
     "thumbnailUrl":"<%= thumbUrl %>",
     "url":"https://pixeora.com/photo/<%= raw %>",
     "width":"<%= width %>",
@@ -243,7 +245,7 @@
     </div>
 
   </div>
-  
+
   <h2>Similar Images</h2>
 
   <!-- REAL RELATED IMAGE GRID -->
@@ -502,8 +504,10 @@ async function loadImageDetails() {
       : (file ? `https://cdn.pixeora.com/thumbs/${file}` : "");
 
     const previewUrl = img.previewFileName
-      ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
-      : `https://cdn.pixeora.com/placeholder.webp`;
+    ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
+    : img.fileName
+        ? `https://cdn.pixeora.com/${encodeURIComponent(img.fileName)}`
+        : "";
 
     const originalUrl = file
       ? `https://cdn.pixeora.com/${file}`
