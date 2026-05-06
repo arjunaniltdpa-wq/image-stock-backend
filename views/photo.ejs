@@ -219,81 +219,46 @@
         <% }) %>
     </div>
 
-    <div class="related-wrapper">
+<div class="related-wrapper">
 
-    <h2>Similar Images</h2>
+  <h2>Similar Images</h2>
 
-    <div class="seo-links-top">
+  <div class="seo-links-top">
 
-        <h3 class="explore-title">
-        Explore More Images
-        </h3>
+    <h3 class="explore-title">
+      Explore More Images
+    </h3>
 
-        <div class="seo-links" id="seo-links-list">
-        <% related.forEach(r => { %>
+    <div class="seo-links" id="seo-links-list">
 
-            <a
-            href="/photo/<%= r.slug %>"
-            class="seo-chip"
-            >
-            <%= r.title %>
-            </a>
+      <% related.forEach(r => { %>
 
-        <% }) %>
-        </div>
+        <a
+          href="/photo/<%= r.slug %>"
+          class="seo-chip"
+        >
+          <%= r.title %>
+        </a>
 
-    </div>
-
-    <!-- REAL RELATED IMAGE GRID -->
-    <div id="related-images">
-
-    <% related.forEach(r => { %>
-
-      <div class="related-card">
-
-        <div class="image-wrapper">
-
-            <a
-              href="/photo/<%= r.slug %>"
-              class="related-link"
-            >
-
-            <img
-              src="<%= r.thumbnailFileName
-                ? `https://cdn.pixeora.com/${r.thumbnailFileName}`
-                : r.previewFileName
-                 ? `https://cdn.pixeora.com/${r.previewFileName}`
-                 : '/images/placeholder.webp'
-              %>"
-              class="image-load image-loaded"
-              alt="<%= r.title %>"
-            loading="lazy"
-            >
-
-            </a>
-
-            <button
-              class="download-overlay"
-              onclick="event.stopPropagation(); downloadImage('<%= r.fileName %>')"
-              type="button"
-              aria-label="Download image"
-            >
-              <img
-                src="/images/download-icon.png"
-                alt="Download"
-              >
-            </button>
-
-        </div>
-
-      </div>
-
-    <% }) %>
+      <% }) %>
 
     </div>
-    </div>
 
-  </main>
+  </div>
+
+  <!-- REAL RELATED IMAGE GRID -->
+  <div class="masonry-grid" id="related-masonry">
+
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+
+  </div>
+
+</div>
+
+</main>
 </div>
 
 <noscript>
