@@ -214,19 +214,19 @@
     </div>
 
     <div class="related-wrapper">
-      <h2>Related Images</h2>
+    <h2>Similar Images</h2>
 
-      <h3 class="explore-title">Explore More Images</h3>
+    <div class="seo-links-top">
+    <h3 class="explore-title">Explore More Images</h3>
 
-      <div class="seo-links" id="seo-links-list">
+    <div class="seo-links" id="seo-links-list">
         <% related.forEach(r => { %>
-            <a href="/photo/<%= r.slug %>" class="seo-chip">
+        <a href="/photo/<%= r.slug %>" class="seo-chip">
             <%= r.title %>
-            </a>
+        </a>
         <% }) %>
-      </div>
-
-      <div id="related-images"></div>
+    </div>
+    </div>
       
     </div>
 
