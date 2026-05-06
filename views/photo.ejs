@@ -370,3 +370,989 @@
 </div>
 
 </body>
+
+
+<script>
+/* ---------------------------------- */
+/* GLOBAL SETTINGS */
+/* ---------------------------------- */
+const API_BASE = "https://api.pixeora.com";
+
+/* ---------------------------------- */
+/* SUBJECT DETECTION */
+/* ---------------------------------- */
+function detectMainSubject(title) {
+  if (!title) return "";
+  const t = title.toLowerCase();
+
+  const map = [
+    ["tiger","tiger"],["lion","lion"],["cat","cat"],["dog","dog"],
+    ["elephant","elephant"],["wolf","wolf"],["bear","bear"],["horse","horse"],
+    ["bird","bird"],["duck","bird"],["eagle","bird"],["sparrow","bird"],["parrot","bird"],
+    ["fish","fish"],["ocean","fish"],["underwater","fish"],["sea","fish"],["coral","fish"],
+    ["bridge","bridge"],["building","architecture"],["architecture","architecture"],["city","architecture"],
+    ["mountain","mountain"],["river","river"],["lake","lake"],["waterfall","waterfall"],["forest","forest"],
+    ["girl","portrait"],["woman","portrait"],["man","portrait"],["kid","portrait"],["face","portrait"],["people","portrait"],
+  ];
+
+  for (let [word, subject] of map) {
+    if (t.includes(word)) return subject;
+  }
+  return "";
+}
+
+/* ---------------------------------- */
+/* UNIVERSAL ID + SLUG (FINAL FIX) */
+/* ---------------------------------- */
+
+let rawSlug = "";
+
+// 1️⃣ Priority: clean /photo/slug-ID URL
+if (window.location.pathname.startsWith("/photo/")) {
+  rawSlug = window.location.pathname.replace("/photo/", "").trim();
+}
+
+// 2️⃣ Fallback: ?slug=slug-ID (old links, bots, download.html)
+if (!rawSlug) {
+  const params = new URLSearchParams(window.location.search);
+  rawSlug = params.get("slug") || "";
+}
+
+if (!rawSlug) {
+  console.error("No slug found in URL");
+}
+
+// Extract Mongo ID if present
+const idMatch = rawSlug.match(/([a-f0-9]{24})$/i);
+const imageId = idMatch ? idMatch[1] : null;
+
+// Clean slug (optional fallback usage)
+let slug = rawSlug
+  .replace(/-[a-f0-9]{24}$/i, "")
+  .replace(/-pixeora$/i, "");
+
+/* ---------------------------------- */
+/* FORCE CLEAN CANONICAL URL */
+/* ---------------------------------- */
+
+// If page opened via download.html?slug=...
+if (
+  rawSlug &&
+  !window.location.pathname.startsWith("/photo/")
+) {
+  window.history.replaceState(
+    null,
+    "",
+    `/photo/${rawSlug}`
+  );
+}
+
+/* ---------------------------------- */
+/* DOWNLOAD HELPER — FORCED DOWNLOAD */
+/* ---------------------------------- */
+async function downloadImage(rawName) {
+  const file = encodeURIComponent(rawName);
+  const apiURL = `${API_BASE}/api/images/download/${file}`;
+
+  // Non-blocking tracking
+  try {
+    navigator.sendBeacon
+      ? navigator.sendBeacon(`${API_BASE}/api/images/track-download/${file}`)
+      : fetch(`${API_BASE}/api/images/track-download/${file}`, { method: "POST" });
+  } catch (e) {}
+
+  // Force download using backend (works on all devices)
+  window.location.href = apiURL;
+}
+
+async function loadImageDetails() {
+  try {
+    let apiList = [];
+
+    // ✅ FIX: always send FULL slug-id (backend expects this)
+    if (rawSlug) {
+      apiList.push(`${API_BASE}/api/images/slug/${rawSlug}`);
+    }
+
+    let img = null;
+
+    for (let url of apiList) {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+
+      console.log("RELATED API:", url);
+
+      const j = await res.json();
+      img = j.image || j.data || j.result || j;
+
+      if (Array.isArray(img)) img = img[0];
+      if (!img || typeof img !== "object") {
+        throw new Error("Invalid image data");
+      }        
+      if (img && (img._id || img.fileName)) break;
+    }
+
+    // Normalize ID
+    if (!img._id && img.id) img._id = img.id;
+
+    // CDN URLs
+    const file = encodeURIComponent(img.fileName || img.file || "");
+    const thumbUrl = img.thumbnailFileName
+      ? `https://cdn.pixeora.com/${encodeURIComponent(img.thumbnailFileName)}`
+      : (file ? `https://cdn.pixeora.com/thumbs/${file}` : "");
+
+    const previewUrl = img.previewFileName
+      ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
+      : `https://cdn.pixeora.com/placeholder.webp`;
+
+    const originalUrl = file
+      ? `https://cdn.pixeora.com/${file}`
+      : (img.url || "");    
+
+    const linkImg = document.createElement("link");
+    linkImg.rel = "image_src";
+    linkImg.href = previewUrl || originalUrl;
+    document.head.appendChild(linkImg);
+
+    const mainImg = document.getElementById("download-image");
+
+    const skeleton = document.getElementById("main-skeleton");
+    if (mainImg.complete) {
+      skeleton.style.display = "none";
+      mainImg.style.visibility = "visible";
+      mainImg.style.opacity = "1";
+    }
+
+    // --- 1️⃣ Show thumbnail immediately (FAST) ---
+    if (thumbUrl) {
+      mainImg.src = thumbUrl;
+      mainImg.style.filter = "blur(6px)";
+      mainImg.style.visibility = "visible"; // 👈 ADD
+      skeleton.style.display = "none";
+    }
+
+    // --- 2️⃣ Upgrade ONLY to preview.webp ---
+    // --- 2️⃣ Decide FINAL image (preview > original) ---
+    const finalMainSrc = previewUrl || originalUrl;
+
+    if (finalMainSrc) {
+      const finalImg = new Image();
+      finalImg.src = finalMainSrc;  
+
+      finalImg.onload = () => {
+        mainImg.src = finalMainSrc;
+        mainImg.style.transition = "filter .4s ease, opacity .3s ease";
+        mainImg.style.filter = "blur(0)"; 
+        mainImg.style.opacity = "1";
+        mainImg.style.visibility = "visible"; // 👈 ADD
+
+        skeleton.style.opacity = "0";
+
+        setTimeout(() => {
+          skeleton.style.display = "none";
+        }, 400);
+
+        if (finalImg.naturalWidth && finalImg.naturalHeight) {
+          mainImg.style.aspectRatio =
+            `${finalImg.naturalWidth}/${finalImg.naturalHeight}`;
+
+          if (typeof ld !== "undefined") {
+            ld.width = finalImg.naturalWidth;
+            ld.height = finalImg.naturalHeight;
+
+            if (ldEl) ldEl.textContent = JSON.stringify(ld);
+          }
+        }
+      };
+    }
+    // Title
+    const safeTitle =
+      img.title?.trim() ||
+      img.fileName?.trim() ||
+      img.slug?.trim() ||
+      "Untitled Image";
+    mainImg.alt = `${safeTitle} – high quality 4k Wallpaper`;
+
+    const tags = (img.tags || []).slice(0, 5).join(", ");
+    const category = img.category || "design projects";
+    const categoryLink = document.createElement("div");
+    categoryLink.innerHTML = `
+      <h3>More in ${category}</h3>
+      <a href="/search.html?query=${encodeURIComponent(category)}">
+        View more ${category} images
+      </a>
+    `;
+
+    document.querySelector(".use-case").appendChild(categoryLink);
+    const useCases = `
+    Best for ${category}, including social media posts, ads, websites, and creative design projects.
+    `;
+
+    document.getElementById("use-case-text").textContent = useCases;
+
+    const dynamicDesc = `
+    ${safeTitle} is a high-quality stock image featuring ${tags}.
+
+    This image is perfect for ${category}, including:
+    - wallpapers
+    - website backgrounds
+    - social media posts
+    - marketing creatives
+
+    Available in HD and 4K resolution, it can be used for both personal and commercial projects without attribution.
+    `;
+    document.getElementById("dynamic-desc").textContent = dynamicDesc;
+
+    document.getElementById("about-heading").textContent = `About ${safeTitle}`;
+
+    document.getElementById("image-caption").textContent =
+      `${safeTitle} high-quality stock image available for free download.`;
+
+    const seoText = `
+    ${safeTitle} featuring ${tags}. 
+    Ideal for ${category}, including ads, websites, and social media. 
+    Free HD image download with no attribution required.
+    `;
+    
+    // Download
+    const downloadAnchor = document.getElementById("download-link");
+
+    if (downloadAnchor && file) {
+
+      downloadAnchor.onclick = (e) => {
+
+        e.preventDefault();
+
+        downloadImage(
+          img.fileName || img.file || ""
+        );
+
+      };
+
+    }
+    window.__originalFileName = img.fileName || img.file || "";
+    window.__imageFileSize = img.size || null;
+
+    // Create schema FIRST
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": "ImageObject",
+
+      "name": safeTitle,
+      "description": img.description || `${safeTitle} featuring ${tags}. High-quality free stock image from Pixeora.`,
+
+      "contentUrl": originalUrl || previewUrl,
+      "thumbnailUrl": thumbUrl,
+
+      "url": window.location.href,
+      "representativeOfPage": true,
+
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": window.location.href
+      },
+
+      "creator": {
+        "@type": "Organization",
+        "name": "Pixeora",
+        "url": "https://pixeora.com"
+      },
+
+      "creditText": "Pixeora Photo",
+      "license": "https://pixeora.com/license",
+      "acquireLicensePage": "https://pixeora.com/license"
+    };
+
+    const breadcrumbSchema = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://pixeora.com"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Stock Images",
+          "item": "https://pixeora.com"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": safeTitle,
+          "item": window.location.href
+        }
+      ]
+    };
+
+    const breadcrumbScript = document.createElement("script");
+    breadcrumbScript.type = "application/ld+json";
+    breadcrumbScript.textContent = JSON.stringify(breadcrumbSchema);
+    document.head.appendChild(breadcrumbScript);
+
+    const ldEl = document.getElementById("ld-json");
+    if (ldEl) ldEl.textContent = JSON.stringify(ld);
+
+    // 👉 Load ORIGINAL image only for dimension accuracy
+    if (originalUrl) {
+      const dimImg = new Image();
+      dimImg.src = originalUrl;
+
+      dimImg.onload = () => {
+        if (dimImg.naturalWidth && dimImg.naturalHeight) {
+          ld.width = dimImg.naturalWidth;
+          ld.height = dimImg.naturalHeight;
+
+          if (ldEl) ldEl.textContent = JSON.stringify(ld);
+        }
+      };
+    }
+
+    // Keywords
+    const keywords =
+      (img.keywords?.length ? img.keywords :
+      img.tags?.length ? img.tags : []).slice(0, 8); // ✅ LIMIT
+
+    // Related
+    const subject = detectMainSubject(img.title || img.fileName || "");
+
+    startRelatedSystem(
+      [subject, img.category, ...keywords.slice(0, 6)].filter(Boolean),
+      img   // 🔥 THIS IS THE IMPORTANT PART
+    );
+
+  } catch (err) {
+    console.error("Loader Error:", err);
+    document.getElementById("image-name").textContent = "Image Not Found.";
+  }
+}
+
+const toggleBtn = document.getElementById("toggleSeo");
+const seoContent = document.getElementById("seoContent");
+const seoCloseBtn = document.getElementById("closeSeoModal");
+const overlay = document.getElementById("seoOverlay");
+
+if (toggleBtn && seoContent && overlay) {
+  toggleBtn.onclick = () => {
+    seoContent.style.display = "block";
+    overlay.style.display = "block";
+  };
+}
+
+if (seoCloseBtn && overlay) {
+  seoCloseBtn.onclick = () => {
+    seoContent.style.display = "none";
+    overlay.style.display = "none";
+  };
+}
+
+// ✅ CLICK OUTSIDE (CORRECT WAY)
+if (overlay && seoContent) {
+
+  overlay.onclick = () => {
+
+    seoContent.style.display = "none";
+
+    overlay.style.display = "none";
+
+  };
+
+}
+
+/* ---------------------------------- */
+/* RELATED SYSTEM – STABLE + SEARCH MATCH */
+/* ---------------------------------- */
+
+let relatedKeywordList = [];
+let relatedKeywordIndex = 0;
+let relatedPage = 1;
+let relatedLoading = false;
+let loadedIds = new Set();
+let relatedColIndex = 0;
+let relatedCursor = null;
+let relatedImageCounter = 0;
+
+/* Helper slug */
+function slugify(text = "") {
+  return text.toString().toLowerCase()
+    .replace(/[^\w ]+/g, "")
+    .replace(/\s+/g, "-")
+    .trim();
+}
+
+function startRelatedSystem(keywords = [], imageData = {}) {
+
+  relatedColIndex = 0;
+  relatedKeywordIndex = 0;
+  relatedPage = 1;
+  relatedLoading = false;
+  relatedCursor = null;
+  loadedIds.clear();
+  relatedImageCounter = 0;
+
+  const grid = document.querySelector("#related-images");
+
+  if (!grid) return;
+
+  grid.innerHTML = `
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+    <div class="masonry-col"></div>
+  `;
+
+  /* Fallback if no keywords */
+  if (!keywords.length && !imageData?.title) {
+    loadRelatedFallback();
+    return;
+  }
+
+  /* ---------------------------------- */
+  /* 🔥 BUILD STRONG SEARCH SIGNAL */
+  /* ---------------------------------- */
+
+  const title = (imageData.title || "").toLowerCase();
+  const file = (imageData.fileName || "").toLowerCase();
+
+  // Extract strong words from title
+  const words = (title || file)
+    .replace(/[^\w ]+/g, "")
+    .split(" ")
+    .filter(w => w.length > 3);
+
+  // Remove weak/common words
+  const stopWords = [
+    "with","from","into","this","that","free","image",
+    "photo","wallpaper","background","hd","4k"
+  ];
+
+  const filteredWords = words.filter(w => !stopWords.includes(w));
+
+  // Pick top 3 strongest words
+  const primaryWords = filteredWords.slice(0, 3);
+
+  /* ---------------------------------- */
+  /* 🔥 PRIORITY ORDER (VERY IMPORTANT) */
+  /* ---------------------------------- */
+
+  const mainQuery =
+    primaryWords.slice(0, 2).join(" ");
+  const category = imageData.category || "";
+  const subject = keywords[0] || "";
+
+  relatedKeywordList = [
+    mainQuery,              // 🔥 EXACT visual match
+    title,                  // 🔥 full title
+    subject,                // medium relevance
+    category,               // fallback
+    ...keywords.slice(1, 5) // weak fallback
+  ].filter(Boolean);
+
+  // Remove duplicates
+  relatedKeywordList = [...new Set(relatedKeywordList)];
+
+  if (!relatedKeywordList.length) {
+    loadRelatedFallback();
+    return;
+  }
+
+  /* ---------------------------------- */
+  /* 🚀 START LOADING */
+  /* ---------------------------------- */
+
+  loadNextKeywordBatch();
+}
+
+/* LOAD FIRST KEYWORD */
+async function loadNextKeywordBatch() {
+  if (relatedKeywordIndex >= relatedKeywordList.length) return;
+  const keyword = relatedKeywordList[relatedKeywordIndex++];
+  relatedPage = 1;
+  await loadMoreRelated(keyword);
+}
+
+/* LOAD MORE */
+async function loadMoreRelated(keyword) {
+  if (relatedLoading) return true;
+  relatedLoading = true;
+
+  try {
+  const strongQuery = keyword;
+
+  const url = relatedCursor
+    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=50`
+    : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=50`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Search API failed");
+
+    const data = await res.json();
+    console.log("RELATED DATA:", data);
+
+    const images = data.images || [];
+    relatedCursor = data.nextCursor || null;
+
+    const unique = images.filter(img => {
+      const id = img._id || img.id;
+      if (!id || loadedIds.has(id)) return false;
+      loadedIds.add(id);
+      if (!img._id) img._id = id;
+      return true;
+    });
+
+    if (!unique.length) {
+      relatedLoading = false;
+      return false;
+    }
+
+    displayRelated(unique);
+    relatedLoading = false;
+    return true;
+
+  } catch (e) {
+    console.error("related grid not found");
+    relatedLoading = false;
+    return false;
+  }
+}
+
+let colIndex = 0;
+function displayRelated(images) {
+
+  if (!images || !images.length) return;
+
+  const masonry =
+    document.getElementById("related-images");
+
+  if (!masonry) {
+    console.error("related-images not found");
+    return;
+  }
+
+  const cols =
+    masonry.querySelectorAll(".masonry-col");
+
+  if (!cols.length) {
+    console.error("masonry columns missing");
+    return;
+  }
+
+  images.forEach((img, index) => {
+
+    if (
+      !img ||
+      (
+        !img.thumbnailFileName &&
+        !img.previewFileName &&
+        !img.fileName
+      )
+    ) return;
+
+    const finalSlug =
+      img.slug
+        ? img.slug
+        : `${slugify(img.title || "image")}-${img._id}`;
+
+    // 🔥 thumbnail priority
+    const imageFile =
+      img.thumbnailFileName ||
+      img.previewFileName ||
+      img.fileName;
+
+    const imageUrl =
+      `https://cdn.pixeora.com/${encodeURIComponent(imageFile)}`;
+
+    const card =
+      document.createElement("div");
+
+    card.className = "image-item";
+
+    card.innerHTML = `
+
+      <div class="image-wrapper">
+
+        <a href="/photo/${finalSlug}">
+
+          <img
+            src="${imageUrl}"
+            alt="${img.title || "Free HD Image"}"
+            loading="lazy"
+          >
+
+        </a>
+
+        <button
+          class="download-overlay"
+          onclick="event.preventDefault(); event.stopPropagation(); downloadImage('${(img.fileName || "").replace(/'/g,"\\\\'")}')"
+          aria-label="Download"
+        ></button>
+
+      </div>
+
+    `;
+
+    // 🔥 distribute columns
+    cols[index % cols.length].appendChild(card);
+
+  });
+
+}
+
+/* ---------------------------------- */
+/* FALLBACK — GUARANTEED CONTENT */
+/* ---------------------------------- */
+async function loadRelatedFallback() {
+
+  const r = await fetch(`${API_BASE}/api/images/popular-latest?limit=200`);
+  const pop = await r.json();
+  let images = pop.images || [];
+
+  images = images.sort(() => Math.random() - 0.5);
+
+  displayRelated(images.slice(0, 50));
+}
+
+/* ---------------------------------- */
+/* INFINITE SCROLL */
+/* ---------------------------------- */
+window.addEventListener("scroll", async () => {
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 400) {
+    const keyword = relatedKeywordList[relatedKeywordIndex - 1];
+    if (!keyword) return;
+
+    const loaded = await loadMoreRelated(keyword);
+    if (!loaded) loadNextKeywordBatch();
+  }
+});
+
+/* ---------------------------------- */
+/* LAZY LOADING */
+/* ---------------------------------- */
+
+/* ---------------------------------- */
+/* INFO MODAL */
+/* ---------------------------------- */
+/* ---------------------------------- */
+/* INFO MODAL */
+/* ---------------------------------- */
+
+const infoBtn =
+  document.querySelector(".info-btn");
+
+const infoModal =
+  document.getElementById("infoModal");
+
+const closeInfoBtn =
+  document.querySelector(".close-btn");
+
+if (infoBtn && infoModal) {
+
+  infoBtn.addEventListener("click", () => {
+
+    const mainImg =
+      document.getElementById("download-image");
+
+    // NAME
+    document.getElementById("info-name").textContent =
+      document.getElementById("image-name").textContent || "-";
+
+    // DIMENSIONS
+    if (mainImg) {
+
+      document.getElementById("info-dimensions").textContent =
+        `${mainImg.naturalWidth || 0} × ${mainImg.naturalHeight || 0}px`;
+
+      const src = mainImg.src || "";
+
+      const ext =
+        src.split(".").pop().split("?")[0].toUpperCase();
+
+      document.getElementById("info-format").textContent =
+        ext || "-";
+
+    }
+
+    // FILE SIZE
+    if (window.__imageFileSize) {
+
+      const sizeMB =
+        (window.__imageFileSize / (1024 * 1024)).toFixed(2);
+
+      document.getElementById("info-size").textContent =
+        `${sizeMB} MB`;
+
+    } else {
+
+      document.getElementById("info-size").textContent = "-";
+
+    }
+
+    infoModal.style.display = "flex";
+
+  });
+
+}
+
+if (closeInfoBtn) {
+
+  closeInfoBtn.addEventListener("click", () => {
+
+    infoModal.style.display = "none";
+
+  });
+
+}
+
+window.addEventListener("click", (e) => {
+
+  if (e.target === infoModal) {
+
+    infoModal.style.display = "none";
+
+  }
+
+});
+
+/* ================= Top Button ================= */
+const goTopBtn = document.getElementById("goTopBtn");
+
+window.addEventListener("scroll", () => {
+
+  if (!goTopBtn) return;
+
+  if (window.scrollY > 400) {
+
+    goTopBtn.style.display = "flex";
+    goTopBtn.style.opacity = "1";
+
+  } else {
+
+    goTopBtn.style.opacity = "0";
+
+    setTimeout(() => {
+
+      if (window.scrollY < 400) {
+        goTopBtn.style.display = "none";
+      }
+
+    }, 300);
+
+  }
+
+});
+
+if (goTopBtn) {
+
+  goTopBtn.addEventListener("click", () => {
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
+  });
+
+}
+
+/* ---------------------------------- */
+/* FORCE SLUG → SLUG-ID REDIRECT */
+/* ---------------------------------- */
+async function ensureCanonicalSlug() {
+  if (!rawSlug) return false;
+
+  if (/[a-f0-9]{24}$/i.test(rawSlug)) {
+    return false; // already canonical
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/images/resolve-slug/${encodeURIComponent(rawSlug)}`
+    );
+
+    if (!res.ok) return false;
+
+    const data = await res.json();
+    if (!data?.slug) return false;
+
+    window.location.replace(`/photo/${data.slug}`);
+    return true; // redirect triggered
+  } catch {
+    return false;
+  }
+}
+
+/* ---------------------------------- */
+/* COOKIE + IMAGE LOAD + SEARCH — SINGLE CLEAN DOM READY */
+/* ---------------------------------- */
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* SEARCH FORM */
+  const form = document.getElementById("searchForm");
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = document.getElementById("searchInput").value.trim();
+      if (q.length > 0) {
+        window.location.href = `/search.html?query=${encodeURIComponent(q)}`;
+      }
+    });
+  }
+
+  /* ENSURE CANONICAL SLUG FIRST */
+  ensureCanonicalSlug();
+
+  /* COOKIE BANNER */
+  const banner = document.getElementById("cookie-banner");
+  const acceptBtn = document.getElementById("cookie-accept");
+
+  if (banner && !localStorage.getItem("cookieConsent")) {
+
+    setTimeout(() => {
+
+      banner.classList.add("show");
+
+    }, 500);
+
+  }
+
+  if (acceptBtn && banner) {
+
+    acceptBtn.addEventListener("click", () => {
+
+      localStorage.setItem("cookieConsent", "true");
+
+      banner.classList.remove("show");
+
+    });
+
+  }
+    /* TOUCH PROTECTION */
+
+  const protectOverlay = document.getElementById("image-protect-overlay");
+
+  if (protectOverlay) {
+
+    let moved = false;
+
+    protectOverlay.addEventListener("touchstart", () => {
+      moved = false;
+    }, { passive: true });
+
+    protectOverlay.addEventListener("touchmove", () => {
+      moved = true;
+    }, { passive: true });
+
+    protectOverlay.addEventListener("touchend", (e) => {
+      if (!moved) e.preventDefault();
+    }, { passive: false });
+
+  }
+  
+});
+
+function handleAdsVisibility() {
+
+  // Hide ads if running locally
+  if (location.protocol === 'file:') {
+    document.querySelectorAll(
+      '.ad-section, .ad-item, .banner-ad, .side-ad-vertical, .bottom-sticky-ad'
+    ).forEach(ad => ad.style.display = 'none');
+    return;
+  }
+
+  document.querySelectorAll('ins.adsbygoogle').forEach(ins => {
+
+    const container = ins.closest(
+      '.ad-section, .ad-item, .banner-ad, .side-ad-vertical, .bottom-sticky-ad'
+    );
+
+    setTimeout(() => {
+      if (!ins.querySelector("iframe")) {
+        if (container) container.style.display = 'none';
+      }
+    }, 2500);
+
+  });
+}
+
+// Run after page load
+window.addEventListener("load", handleAdsVisibility);
+
+// Re-check after every ad push
+const originalPush = (window.adsbygoogle = window.adsbygoogle || []).push;
+window.adsbygoogle.push = function () {
+  originalPush.apply(this, arguments);
+  setTimeout(handleAdsVisibility, 2500);
+};
+
+/* 🔥 SCROLL-AWARE LEGAL BAR */
+let lastScrollTop = 0;
+const legalBar = document.getElementById("legalBar");
+let ticking = false;
+
+if (legalBar) {
+
+  window.addEventListener("scroll", () => {
+
+    if (!ticking) {
+
+      window.requestAnimationFrame(() => {
+
+        const scrollTop =
+          window.pageYOffset ||
+          document.documentElement.scrollTop;
+
+        // show at top
+        if (scrollTop < 100) {
+
+          legalBar.classList.remove("hidden");
+
+        }
+        // scrolling down
+        else if (scrollTop > lastScrollTop) {
+
+          legalBar.classList.add("hidden");
+
+        }
+        // scrolling up
+        else {
+
+          legalBar.classList.remove("hidden");
+
+        }
+
+        lastScrollTop =
+          scrollTop <= 0 ? 0 : scrollTop;
+
+        ticking = false;
+
+      });
+
+      ticking = true;
+
+    }
+
+  });
+
+}
+
+const revealElements = document.querySelectorAll(".reveal-on-scroll");
+
+loadImageDetails().catch(err => {
+  console.error("FULL LOAD ERROR:", err);
+});
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add("revealed");
+    }
+  });
+}, { threshold: 0.2 });
+
+revealElements.forEach(el => observer.observe(el));
+
+</script>
