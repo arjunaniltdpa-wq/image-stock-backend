@@ -976,20 +976,28 @@ function displayRelated(images) {
 
         <a href="/photo/${finalSlug}">
 
-          <img
+            <img
             src="${imageUrl}"
             alt="${img.title || "Free HD Image"}"
-            loading="lazy"
-          >
+            loading="eager"
+            decoding="async"
+            fetchpriority="low"
+            >
 
         </a>
 
         <button
-          class="download-overlay"
-          onclick="event.preventDefault(); event.stopPropagation(); downloadImage('${(img.fileName || "").replace(/'/g,"\\\\'")}')"
-          aria-label="Download"
-        ></button>
+        class="download-overlay"
+        onclick="event.preventDefault(); event.stopPropagation(); downloadImage('${(img.fileName || "").replace(/'/g,"\\\\'")}')"
+        aria-label="Download"
+        >
 
+        <img
+            src="/images/download.png"
+            alt="Download"
+        >
+
+        </button>
       </div>
 
     `;
