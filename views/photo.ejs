@@ -190,14 +190,13 @@
           <button id="toggleSeo">Show More</button>
         </div>
 
-        <a
+        <button
         id="download-link"
         class="download-btn"
-        href="<%= originalUrl %>?download=1"
-        download="<%= title %>.jpg"
+        onclick="forceDownload('<%= originalUrl %>', '<%= title %>.jpg')"
         >
         <i class="fas fa-download"></i> Download
-        </a>
+        </button>
 
       </div>
 
