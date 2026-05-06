@@ -245,8 +245,43 @@
     </div>
 
     <!-- REAL RELATED IMAGE GRID -->
-    <div id="related-images"></div>
+    <div id="related-images">
 
+    <% related.forEach(r => { %>
+
+      <div class="related-card">
+
+        <div class="image-wrapper">
+
+            <a
+              href="/photo/<%= r.slug %>"
+              class="related-link"
+            >
+
+            <img
+                src="https://cdn.pixeora.com/<%= r.thumbnailFileName || r.previewFileName || r.fileName %>"
+                class="image-load image-loaded"
+                alt="<%= r.title %>"
+                loading="lazy"
+            >
+
+            </a>
+
+            <button
+              class="download-overlay"
+              onclick="event.stopPropagation(); downloadImage('<%= r.fileName %>')"
+              type="button"
+            >
+              ↓
+            </button>
+
+        </div>
+
+      </div>
+
+    <% }) %>
+
+    </div>
     </div>
 
   </main>
