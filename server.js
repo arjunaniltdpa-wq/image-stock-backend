@@ -47,6 +47,9 @@ dotenv.config();
 // Express app
 const app = express();
 
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
 // Resolve slug WITHOUT ID → return canonical slug-ID
 app.get("/api/images/resolve-slug/:slug", async (req, res) => {
   const baseSlug = req.params.slug;

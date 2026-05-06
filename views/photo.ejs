@@ -1,0 +1,344 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO -->
+  <meta name="robots" content="index, follow">
+
+  <title><%= title %></title>
+  <meta name="description" content="<%= desc %>">
+
+  <!-- Pinterest verification -->
+  <meta name="pinterest-rich-pin" content="false">
+  <meta name="p:domain_verify" content="baeea6bc953c52f33c6f450565b4a8ab">
+  <meta name="theme-color" content="#ffffff">
+
+  <!-- OG TAGS SERVED BY BACKEND -->
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://pixeora.com/photo/<%= raw %>">
+  <meta property="og:title" content="<%= title %>">
+  <meta property="og:description" content="<%= desc %>">
+
+  <meta property="og:image" content="<%= ogPinterest %>">
+  <meta property="og:image:width" content="<%= pinterestWidth %>">
+  <meta property="og:image:height" content="<%= pinterestHeight %>">
+
+  <meta property="og:image" content="<%= ogDefault %>">
+  <meta property="og:image:width" content="<%= width %>">
+  <meta property="og:image:height" content="<%= height %>">
+
+  <meta name="twitter:card" content="summary_large_image">   
+  <!-- DO NOT define og:image here -->
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Marck+Script&display=swap" rel="stylesheet">
+
+  <!-- Favicons -->
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!-- Styles -->
+  <link rel="preload" href="/css/download.css" as="style">
+  <link rel="stylesheet" href="/css/download.css">
+  <link rel="stylesheet" href="/css/cookie.css">
+
+  <!-- Performance -->
+  <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
+  <link rel="preconnect" href="https://api.pixeora.com" crossorigin>
+  
+  <!-- Organization Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Pixeora",
+    "url": "https://pixeora.com",
+    "logo": "https://pixeora.com/images/logo.png"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"ImageObject",
+    "name":"<%= title %>",
+    "description":"<%= desc %>",
+    "contentUrl":"<%= originalUrl %>",
+    "thumbnailUrl":"<%= thumbUrl %>",
+    "url":"https://pixeora.com/photo/<%= raw %>",
+    "width":"<%= width %>",
+    "height":"<%= height %>"
+  }
+  </script>
+  <link rel="canonical" href="https://pixeora.com/photo/<%= raw %>">
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-VPX3GGRR7H"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-VPX3GGRR7H');
+  </script>
+  <!-- Google AdSense -->
+  <script async
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4549865852809903"
+    crossorigin="anonymous"></script>
+
+</head>
+
+<body>
+<header class="header">
+  <div class="header-overlay">
+
+    <a href="/index.html" class="logo">Pixeora</a>
+
+    <div class="search-bar-wrapper">
+      <div class="search-bar-border">
+        <form class="search-bar" id="searchForm">
+          <input type="text" id="searchInput" placeholder="Search Image" required>
+          <button type="submit" class="search-icon">
+            <img src="/images/search-icon.png" alt="Search" loading="lazy">
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <a href="/legal.html" class="legal-link-header">Legal & Policies</a>
+
+  </div>
+</header>
+
+<!-- 🔥 TOP PHOTO PAGE AD -->
+<section class="ad-section ad-photo-top">
+  <ins class="adsbygoogle"
+      style="display:block"
+      data-ad-client="ca-pub-4549865852809903"
+      data-ad-slot="1551401768"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>
+</section>
+
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+<div class="page-wrapper">
+  <main>
+
+    <div class="image-section">
+
+      <!-- 🔒 MAIN IMAGE (INSIDE BOX) -->
+      <div class="protected-wrapper">
+
+        <div id="main-skeleton" class="skeleton"></div>
+          <img
+            id="download-image"
+            src="<%= previewUrl %>" 
+            loading="eager"
+            fetchpriority="high"
+            width="<%= width %>"
+            height="<%= height %>"
+            alt="<%= title %> free HD wallpaper and stock image"
+          />
+      
+        <div id="image-protect-overlay"></div>
+      </div>
+
+      <h1 id="image-name">
+        <%= title %> Free HD Image
+      </h1>
+
+      <p class="hidden-seo-text">
+      High quality free stock image download, 4K wallpaper, HD background, royalty-free image for commercial and personal use.
+      </p>
+      <!-- 🔥 SEO BOOST BLOCK (IMPORTANT - DO NOT REMOVE) -->
+      <div class="seo-hidden">
+
+        <h2>Free HD & 4K Stock Image Download</h2>
+
+        <p>
+          Download high-quality HD and 4K stock images for free on Pixeora.
+          Perfect for wallpapers, website backgrounds, social media posts,
+          and commercial use without attribution.
+        </p>
+
+        <p>
+          Explore a wide collection of free images including nature, cars,
+          business, abstract, and creative backgrounds.
+          All images are optimized for fast download and high resolution.
+        </p>
+
+      </div>      
+      <p id="image-caption" class="img-caption"></p>
+
+      <p id="seo-description" class="seo-desc">
+        <%= desc %>
+      </p>
+            
+      <div class="image-actions">
+
+        <div class="left-actions">
+          <button class="info-btn">
+            <i class="fas fa-info-circle"></i> Info
+          </button> 
+
+          <button id="toggleSeo">Show More</button>
+        </div>
+
+        <a
+          id="download-link"
+          href="<%= originalUrl %>"
+          download
+        >
+          <button class="download-btn">
+            <i class="fas fa-download"></i> Download
+          </button>
+        </a>
+
+      </div>
+
+    </div>
+
+    <!-- ⭐ Updated Keywords Block -->
+    <div class="keywords" id="keywords">
+        <% keywords.forEach(k => { %>
+            <a href="/search.html?query=<%= encodeURIComponent(k) %>">
+            <%= k %>
+            </a>
+        <% }) %>
+    </div>
+
+    <div class="related-wrapper">
+      <h2>Related Images</h2>
+
+      <h3 class="explore-title">Explore More Images</h3>
+
+      <div class="seo-links" id="seo-links-list">
+        <% related.forEach(r => { %>
+            <a href="/photo/<%= r.slug %>" class="seo-chip">
+            <%= r.title %>
+            </a>
+        <% }) %>
+      </div>
+
+      <div id="related-images"></div>
+      
+    </div>
+
+  </main>
+</div>
+
+<noscript>
+  <h1>Free HD Stock Image</h1>
+  <p>
+    Download high-quality HD and 4K stock images for free.
+    Suitable for websites, wallpapers, and commercial use.
+  </p>
+</noscript>
+
+<div class="seo-collapse">
+
+  <div id="seoContent" style="display:none;">
+
+    <div class="modal-header">
+      <button id="closeSeoModal">✕</button>
+    </div>
+
+    <!-- KEEP YOUR EXISTING SECTIONS HERE -->
+    <section class="image-description">
+      <h2 id="about-heading"></h2>
+      <p id="dynamic-desc"></p>
+
+      <!-- 🔥 STATIC SEO CONTENT -->
+      <div class="static-seo">
+        <h3>About this image</h3>
+        <p>
+          This image is part of a high-quality stock collection available for free download.
+          It can be used for wallpapers, website backgrounds, social media posts, and creative design projects.
+          All images on Pixeora are free for personal and commercial use without attribution.
+        </p>
+      </div>
+    </section>
+
+    <section class="license-box">
+      <h3>License Information</h3>
+      <p>
+        This image is free for personal and commercial use. No attribution is required.
+        Redistribution or resale of the image as a standalone file is not allowed.
+      </p>
+    </section>
+
+    <div class="use-case">
+      <h3>Best Uses</h3>
+      <p id="use-case-text"></p>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="seoOverlay" style="display:none;"></div>
+
+<!-- 🔥 KEYWORDS AD -->
+<section class="ad-section ad-photo-mid">
+  <ins class="adsbygoogle"
+      style="display:block"
+      data-ad-client="ca-pub-4549865852809903"
+      data-ad-slot="2074145941"
+      data-ad-format="rectangle"></ins>
+</section>
+
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+<button id="goTopBtn" aria-label="Go to top">
+  <svg class="arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M8 5l8 7-8 7" />
+  </svg>
+</button>
+
+<!-- INFO MODAL -->
+<div id="infoModal" class="info-modal">
+  <div class="info-content">
+    <span class="close-btn">&times;</span>
+    <h2>Image Information</h2>
+    <ul>
+      <li><strong>Name:</strong> <span id="info-name">-</span></li>
+      <li><strong>Dimensions:</strong> <span id="info-dimensions">-</span></li>
+      <li><strong>File Size:</strong> <span id="info-size">-</span></li>
+      <li><strong>Format:</strong> <span id="info-format">-</span></li>
+      <li><strong>License:</strong> Free to use for commercial and personal purposes</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 🔥 SMART LEGAL BAR -->
+<div id="legalBar">
+  <div class="legal-inner">
+    <span>© 2026 Pixeora • Free stock images for personal & commercial use</span>
+    <div class="legal-links">
+      <a href="/cookies.html">Cookies</a>
+      <a href="/privacy-policy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/dmca.html">DMCA</a>
+      <a href="/contact.html">Contact</a>
+    </div>
+  </div>
+</div>
+
+<div id="cookie-banner" class="premium-cookie">
+  <div class="cookie-content">
+    <p class="cookie-message">
+      We use cookies to enhance your browsing experience and analyze traffic.
+    </p>
+    <button id="cookie-accept" class="cookie-btn-premium">Got it</button>
+  </div>
+</div>
+
+</body>
