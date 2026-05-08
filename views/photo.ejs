@@ -139,80 +139,153 @@
 <div class="page-wrapper">
   <main>
 
-    <div class="image-section">
+    <!-- ======================================
+         WALLPAPER LAYOUT
+    ======================================= -->
 
-      <!-- 🔒 MAIN IMAGE (INSIDE BOX) -->
-      <div class="protected-wrapper">
+    <section class="wallpaper-layout">
 
-        <div id="main-skeleton" class="skeleton"></div>
-          <img
-            id="download-image"
-            src="<%= previewUrl %>" 
-            loading="eager"
-            fetchpriority="high"
-            width="<%= width %>"
-            height="<%= height %>"
-            alt="<%= title %>"
-          />
-      
-        <div id="image-protect-overlay"></div>
-      </div>
+      <div class="wallpaper-container">
 
-      <h1><%= title %></h1>
-  
-      <p id="image-caption" class="img-caption"></p>
+        <!-- ======================================
+             LEFT SIDE IMAGE
+        ======================================= -->
 
-      <p id="seo-description" class="seo-desc">
-        <%= desc %>
-      </p>
-            
-      <div class="image-actions">
+        <div class="wallpaper-image">
 
-        <div class="left-actions">
-          <button class="info-btn">
-            <i class="fas fa-info-circle"></i> Info
-          </button> 
+          <div class="image-section">
+
+            <!-- 🔒 MAIN IMAGE -->
+            <div class="protected-wrapper">
+
+              <div id="main-skeleton" class="skeleton"></div>
+
+              <img
+                id="download-image"
+                src="<%= previewUrl %>"
+                loading="eager"
+                fetchpriority="high"
+                width="<%= width %>"
+                height="<%= height %>"
+                alt="<%= title %>"
+              />
+
+              <div id="image-protect-overlay"></div>
+
+            </div>
+
           </div>
 
-        <a
-          id="download-link"
-          class="download-btn"
-          href="<%= originalUrl %>"
-          download="<%= title %>.jpg"
-        >
-          <i class="fas fa-download"></i> Download
-        </a>
+        </div>
+
+        <!-- ======================================
+             RIGHT SIDE DETAILS
+        ======================================= -->
+
+        <div class="wallpaper-details">
+
+          <!-- TITLE -->
+          <h1><%= title %></h1>
+
+          <!-- DESCRIPTION -->
+          <p id="seo-description" class="seo-desc">
+            <%= desc %>
+          </p>
+
+          <!-- ACTION BUTTONS -->
+          <div class="image-actions">
+
+            <div class="left-actions">
+
+              <button class="info-btn">
+                <i class="fas fa-info-circle"></i> Info
+              </button>
+
+            </div>
+
+            <a
+              id="download-link"
+              class="download-btn"
+              href="<%= originalUrl %>"
+              download="<%= title %>.jpg"
+            >
+              <i class="fas fa-download"></i> Download
+            </a>
+
+          </div>
+
+          <!-- IMAGE DETAILS -->
+          <div class="detail-group">
+
+            <div class="detail-label">
+              Image Details
+            </div>
+
+            <div class="detail-tags">
+
+              <a href="#">
+                <%= width %> × <%= height %>
+              </a>
+
+              <a href="#">
+                <%= format || "JPG" %>
+              </a>
+
+              <a href="#">
+                High Quality
+              </a>
+
+            </div>
+
+          </div>
+
+          <!-- KEYWORDS -->
+          <div class="detail-group">
+
+            <div class="detail-label">
+              Tags
+            </div>
+
+            <div class="detail-tags">
+
+              <% keywords.slice(0,5).forEach(k => { %>
+
+                <a href="/search.html?query=<%= encodeURIComponent(k) %>">
+                  <%= k %>
+                </a>
+
+              <% }) %>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ======================================
+         RELATED IMAGES
+    ======================================= -->
+
+    <div class="related-wrapper">
+
+      <h2>Similar Images</h2>
+
+      <div id="related-images" class="masonry-grid">
+
+        <div class="masonry-col"></div>
+        <div class="masonry-col"></div>
+        <div class="masonry-col"></div>
+        <div class="masonry-col"></div>
 
       </div>
 
     </div>
 
-    <!-- ⭐ Updated Keywords Block -->
-    <div class="keywords" id="keywords">
-        <% keywords.forEach(k => { %>
-            <a href="/search.html?query=<%= encodeURIComponent(k) %>">
-            <%= k %>
-            </a>
-        <% }) %>
-    </div>
-
-<div class="related-wrapper">
-
-  <h2>Similar Images</h2>
-
-  <!-- REAL RELATED IMAGE GRID -->
-  <div id="related-images" class="masonry-grid">
-
-    <div class="masonry-col"></div>
-    <div class="masonry-col"></div>
-    <div class="masonry-col"></div>
-    <div class="masonry-col"></div>
-
-  </div>
-
-</div>
-
-</main>
+  </main>
 </div>
 
 <noscript>
@@ -389,8 +462,6 @@ async function loadImageDetails() {
       const res = await fetch(url);
       if (!res.ok) continue;
 
-      console.log("RELATED API:", url);
-
       const j = await res.json();
       img = j.image || j.data || j.result || j;
 
@@ -483,8 +554,6 @@ async function loadImageDetails() {
       img.slug?.trim() ||
       "Untitled Image";
     mainImg.alt = safeTitle;
-
-    const tags = (img.tags || []).slice(0, 5).join(", ");
 
     // Download
     const downloadAnchor = document.getElementById("download-link");
@@ -681,7 +750,6 @@ function startRelatedSystem(keywords = [], imageData = {}) {
 
   const mainQuery =
     primaryWords.slice(0, 2).join(" ");
-  const category = imageData.category || "";
   const subject = keywords[0] || "";
 
   relatedKeywordList = [
@@ -729,7 +797,6 @@ async function loadMoreRelated(keyword) {
     if (!res.ok) throw new Error("Search API failed");
 
     const data = await res.json();
-    console.log("RELATED DATA:", data);
 
     const images = data.images || [];
     relatedCursor = data.nextCursor || null;
@@ -752,7 +819,6 @@ async function loadMoreRelated(keyword) {
     return true;
 
   } catch (e) {
-    console.error("related grid not found");
     relatedLoading = false;
     return false;
   }
@@ -773,11 +839,6 @@ function displayRelated(images) {
 
   const cols =
     masonry.querySelectorAll(".masonry-col");
-
-  if (!cols.length) {
-    console.error("masonry columns missing");
-    return;
-  }
 
   images.forEach((img, index) => {
 
@@ -853,13 +914,13 @@ function displayRelated(images) {
 /* ---------------------------------- */
 async function loadRelatedFallback() {
 
-  const r = await fetch(`${API_BASE}/api/images/popular-latest?limit=200`);
+  const r = await fetch(`${API_BASE}/api/images/popular-latest?limit=60`);
   const pop = await r.json();
   let images = pop.images || [];
 
   images = images.sort(() => Math.random() - 0.5);
 
-  displayRelated(images.slice(0, 50));
+  displayRelated(images.slice(0, 24));
 }
 
 /* ---------------------------------- */
