@@ -152,37 +152,14 @@
             fetchpriority="high"
             width="<%= width %>"
             height="<%= height %>"
-            alt="<%= title %> free HD wallpaper and stock image"
+            alt="<%= title %>"
           />
       
         <div id="image-protect-overlay"></div>
       </div>
 
-      <h1 id="image-name">
-        <%= title %> Free HD Image
-      </h1>
-
-      <p class="hidden-seo-text">
-      High quality free stock image download, 4K wallpaper, HD background, royalty-free image for commercial and personal use.
-      </p>
-      <!-- 🔥 SEO BOOST BLOCK (IMPORTANT - DO NOT REMOVE) -->
-      <div class="seo-hidden">
-
-        <h2>Free HD & 4K Stock Image Download</h2>
-
-        <p>
-          Download high-quality HD and 4K stock images for free on Pixeora.
-          Perfect for wallpapers, website backgrounds, social media posts,
-          and commercial use without attribution.
-        </p>
-
-        <p>
-          Explore a wide collection of free images including nature, cars,
-          business, abstract, and creative backgrounds.
-          All images are optimized for fast download and high resolution.
-        </p>
-
-      </div>      
+      <h1><%= title %></h1>
+  
       <p id="image-caption" class="img-caption"></p>
 
       <p id="seo-description" class="seo-desc">
@@ -195,9 +172,7 @@
           <button class="info-btn">
             <i class="fas fa-info-circle"></i> Info
           </button> 
-
-          <button id="toggleSeo">Show More</button>
-        </div>
+          </div>
 
         <a
           id="download-link"
@@ -223,29 +198,6 @@
 
 <div class="related-wrapper">
 
-  <div class="seo-links-top">
-
-    <h3 class="explore-title">
-      Explore More Images
-    </h3>
-
-    <div class="seo-links" id="seo-links-list">
-
-      <% related.forEach(r => { %>
-
-        <a
-          href="/photo/<%= r.slug %>"
-          class="seo-chip"
-        >
-          <%= r.title %>
-        </a>
-
-      <% }) %>
-
-    </div>
-
-  </div>
-
   <h2>Similar Images</h2>
 
   <!-- REAL RELATED IMAGE GRID -->
@@ -264,55 +216,10 @@
 </div>
 
 <noscript>
-  <h1>Free HD Stock Image</h1>
   <p>
-    Download high-quality HD and 4K stock images for free.
-    Suitable for websites, wallpapers, and commercial use.
+    <%= title %>
   </p>
 </noscript>
-
-<div class="seo-collapse">
-
-  <div id="seoContent" style="display:none;">
-
-    <div class="modal-header">
-      <button id="closeSeoModal">✕</button>
-    </div>
-
-    <!-- KEEP YOUR EXISTING SECTIONS HERE -->
-    <section class="image-description">
-      <h2 id="about-heading"></h2>
-      <p id="dynamic-desc"></p>
-
-      <!-- 🔥 STATIC SEO CONTENT -->
-      <div class="static-seo">
-        <h3>About this image</h3>
-        <p>
-          This image is part of a high-quality stock collection available for free download.
-          It can be used for wallpapers, website backgrounds, social media posts, and creative design projects.
-          All images on Pixeora are free for personal and commercial use without attribution.
-        </p>
-      </div>
-    </section>
-
-    <section class="license-box">
-      <h3>License Information</h3>
-      <p>
-        This image is free for personal and commercial use. No attribution is required.
-        Redistribution or resale of the image as a standalone file is not allowed.
-      </p>
-    </section>
-
-    <div class="use-case">
-      <h3>Best Uses</h3>
-      <p id="use-case-text"></p>
-    </div>
-
-  </div>
-
-</div>
-
-<div id="seoOverlay" style="display:none;"></div>
 
 <!-- 🔥 KEYWORDS AD -->
 <section class="ad-section ad-photo-mid">
@@ -575,49 +482,10 @@ async function loadImageDetails() {
       img.fileName?.trim() ||
       img.slug?.trim() ||
       "Untitled Image";
-    mainImg.alt = `${safeTitle} – high quality 4k Wallpaper`;
+    mainImg.alt = safeTitle;
 
     const tags = (img.tags || []).slice(0, 5).join(", ");
-    const category = img.category || "design projects";
-    const categoryLink = document.createElement("div");
-    categoryLink.innerHTML = `
-      <h3>More in ${category}</h3>
-      <a href="/search.html?query=${encodeURIComponent(category)}">
-        View more ${category} images
-      </a>
-    `;
 
-    document.querySelector(".use-case").appendChild(categoryLink);
-    const useCases = `
-    Best for ${category}, including social media posts, ads, websites, and creative design projects.
-    `;
-
-    document.getElementById("use-case-text").textContent = useCases;
-
-    const dynamicDesc = `
-    ${safeTitle} is a high-quality stock image featuring ${tags}.
-
-    This image is perfect for ${category}, including:
-    - wallpapers
-    - website backgrounds
-    - social media posts
-    - marketing creatives
-
-    Available in HD and 4K resolution, it can be used for both personal and commercial projects without attribution.
-    `;
-    document.getElementById("dynamic-desc").textContent = dynamicDesc;
-
-    document.getElementById("about-heading").textContent = `About ${safeTitle}`;
-
-    document.getElementById("image-caption").textContent =
-      `${safeTitle} high-quality stock image available for free download.`;
-
-    const seoText = `
-    ${safeTitle} featuring ${tags}. 
-    Ideal for ${category}, including ads, websites, and social media. 
-    Free HD image download with no attribution required.
-    `;
-    
     // Download
     const downloadAnchor = document.getElementById("download-link");
 
@@ -643,7 +511,7 @@ async function loadImageDetails() {
       "@type": "ImageObject",
 
       "name": safeTitle,
-      "description": img.description || `${safeTitle} featuring ${tags}. High-quality free stock image from Pixeora.`,
+      "description": img.description || safeTitle,
 
       "contentUrl": originalUrl || previewUrl,
       "thumbnailUrl": thumbUrl,
@@ -718,53 +586,22 @@ async function loadImageDetails() {
     // Keywords
     const keywords =
       (img.keywords?.length ? img.keywords :
-      img.tags?.length ? img.tags : []).slice(0, 8); // ✅ LIMIT
+      img.tags?.length ? img.tags : []).slice(0, 5); // ✅ LIMIT
 
     // Related
     const subject = detectMainSubject(img.title || img.fileName || "");
 
     startRelatedSystem(
-      [subject, img.category, ...keywords.slice(0, 6)].filter(Boolean),
+      [subject, ...keywords.slice(0,3)].filter(Boolean),
       img   // 🔥 THIS IS THE IMPORTANT PART
     );
 
   } catch (err) {
     console.error("Loader Error:", err);
-    document.getElementById("image-name").textContent = "Image Not Found.";
+    document.querySelector("h1").textContent = "Image Not Found.";
   }
 }
 
-const toggleBtn = document.getElementById("toggleSeo");
-const seoContent = document.getElementById("seoContent");
-const seoCloseBtn = document.getElementById("closeSeoModal");
-const overlay = document.getElementById("seoOverlay");
-
-if (toggleBtn && seoContent && overlay) {
-  toggleBtn.onclick = () => {
-    seoContent.style.display = "block";
-    overlay.style.display = "block";
-  };
-}
-
-if (seoCloseBtn && overlay) {
-  seoCloseBtn.onclick = () => {
-    seoContent.style.display = "none";
-    overlay.style.display = "none";
-  };
-}
-
-// ✅ CLICK OUTSIDE (CORRECT WAY)
-if (overlay && seoContent) {
-
-  overlay.onclick = () => {
-
-    seoContent.style.display = "none";
-
-    overlay.style.display = "none";
-
-  };
-
-}
 
 /* ---------------------------------- */
 /* RELATED SYSTEM – STABLE + SEARCH MATCH */
@@ -849,9 +686,7 @@ function startRelatedSystem(keywords = [], imageData = {}) {
 
   relatedKeywordList = [
     mainQuery,              // 🔥 EXACT visual match
-    title,                  // 🔥 full title
     subject,                // medium relevance
-    category,               // fallback
     ...keywords.slice(1, 5) // weak fallback
   ].filter(Boolean);
 
@@ -887,8 +722,8 @@ async function loadMoreRelated(keyword) {
   const strongQuery = keyword;
 
   const url = relatedCursor
-    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=50`
-    : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=50`;
+    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=24`
+    : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=24`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Search API failed");
@@ -982,8 +817,8 @@ function displayRelated(images) {
 
             <img
             src="${imageUrl}"
-            alt="${img.title || "Free HD Image"}"
-            loading="eager"
+            alt="${img.title || ""}"
+            loading="lazy"
             decoding="async"
             fetchpriority="low"
             >
@@ -1069,7 +904,7 @@ if (infoBtn && infoModal) {
 
     // NAME
     document.getElementById("info-name").textContent =
-      document.getElementById("image-name").textContent || "-";
+      document.querySelector("h1")?.textContent || "-"
 
     // DIMENSIONS
     if (mainImg) {
