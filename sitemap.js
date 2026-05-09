@@ -9,7 +9,7 @@ const router = express.Router();
 const SITE = "https://pixeora.com";
 const API_SITE = "https://api.pixeora.com";  
 const CDN = "https://cdn.pixeora.com";      
-const IMAGES_PER_SITEMAP = 5000;
+const IMAGES_PER_SITEMAP = 2000;
 
 // Escape XML special characters
 function escapeXML(str = "") {
@@ -109,7 +109,8 @@ router.get("/sitemap-static.xml", (req, res) => {
 router.get("/sitemap-latest.xml", async (req, res) => {
   try {
     const images = await Image.find({})
-      .sort({ updatedAt: -1, uploadedAt: -1 })
+      .select("slug updatedAt uploadedAt")
+      .sort({ uploadedAt: -1 })
       .limit(1000)
       .lean();
 
@@ -188,9 +189,14 @@ router.get("/sitemap-images-:page.xml", async (req, res) => {
 `);
 
     const cursor = Image.find({})
-      .sort({ updatedAt: -1, uploadedAt: -1 })
+      .select(
+        "slug title name description updatedAt uploadedAt fileName previewFileName thumbnailFileName"
+      )
+      .sort({ uploadedAt: -1 })
+      .allowDiskUse(true)
       .skip(skip)
       .limit(IMAGES_PER_SITEMAP)
+      .lean()
       .cursor();
 
     for await (const img of cursor) {
