@@ -215,6 +215,12 @@
                 <i class="fas fa-info-circle"></i> Info
               </button>
 
+              <button class="share-btn" id="openShareModal">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 5.35064 15.0602 5.6872 15.1707 6L8.91 9.13C8.36 8.43 7.52 8 6.58 8C4.92 8 3.58 9.34 3.58 11C3.58 12.66 4.92 14 6.58 14C7.52 14 8.36 13.57 8.91 12.87L15.17 16C15.06 16.31 15 16.65 15 17C15 18.66 16.34 20 18 20C19.66 20 21 18.66 21 17C21 15.34 19.66 14 18 14C17.06 14 16.22 14.43 15.67 15.13L9.41 12C9.52 11.69 9.58 11.35 9.58 11C9.58 10.65 9.52 10.31 9.41 10L15.67 6.87C16.22 7.57 17.06 8 18 8Z" fill="currentColor"/>
+                </svg>
+              </button>
+
             </div>
 
             <a
@@ -340,6 +346,58 @@
       <li><strong>License:</strong> Free to use for commercial and personal purposes</li>
     </ul>
   </div>
+</div>
+
+<div class="share-modal" id="shareModal">
+
+  <div class="share-content">
+
+    <div class="share-header">
+      <h3>Share Image</h3>
+      <button class="close-share" id="closeShareModal">×</button>
+    </div>
+
+    <div class="share-grid">
+
+      <a id="pinterestShare" target="_blank" class="share-item pinterest">
+        <img src="/icons/pinterest.svg">
+        <span>Pinterest</span>
+      </a>
+
+      <a id="facebookShare" target="_blank" class="share-item facebook">
+        <img src="/icons/facebook.svg">
+        <span>Facebook</span>
+      </a>
+
+      <a id="twitterShare" target="_blank" class="share-item twitter">
+        <img src="/icons/twitter.svg">
+        <span>X</span>
+      </a>
+
+      <a id="whatsappShare" target="_blank" class="share-item whatsapp">
+        <img src="/icons/whatsapp.svg">
+        <span>WhatsApp</span>
+      </a>
+
+      <a id="telegramShare" target="_blank" class="share-item telegram">
+        <img src="/icons/telegram.svg">
+        <span>Telegram</span>
+      </a>
+
+    </div>
+
+    <div class="copy-section">
+
+      <input type="text" id="shareUrl" readonly>
+
+      <button id="copyShareBtn">
+        Copy URL
+      </button>
+
+    </div>
+
+  </div>
+
 </div>
 
 <!-- 🔥 SMART LEGAL BAR -->
@@ -685,6 +743,55 @@ async function loadImageDetails() {
   }
 }
 
+const shareModal = document.getElementById("shareModal");
+const openShareModal = document.getElementById("openShareModal");
+const closeShareModal = document.getElementById("closeShareModal");
+
+const currentUrl = window.location.href;
+
+document.getElementById("shareUrl").value = currentUrl;
+
+document.getElementById("pinterestShare").href =
+`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(currentUrl)}`;
+
+document.getElementById("facebookShare").href =
+`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`;
+
+document.getElementById("twitterShare").href =
+`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}`;
+
+document.getElementById("whatsappShare").href =
+`https://api.whatsapp.com/send?text=${encodeURIComponent(currentUrl)}`;
+
+document.getElementById("telegramShare").href =
+`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}`;
+
+openShareModal.onclick = () => {
+  shareModal.classList.add("active");
+};
+
+closeShareModal.onclick = () => {
+  shareModal.classList.remove("active");
+};
+
+shareModal.onclick = (e) => {
+  if(e.target === shareModal){
+    shareModal.classList.remove("active");
+  }
+};
+
+document.getElementById("copyShareBtn").onclick = async () => {
+
+  await navigator.clipboard.writeText(currentUrl);
+
+  const btn = document.getElementById("copyShareBtn");
+
+  btn.innerText = "Copied!";
+
+  setTimeout(()=>{
+    btn.innerText = "Copy URL";
+  },2000);
+};
 
 /* ---------------------------------- */
 /* RELATED SYSTEM – STABLE + SEARCH MATCH */
