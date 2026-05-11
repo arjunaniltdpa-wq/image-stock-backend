@@ -15,8 +15,12 @@ import mime from "mime";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
-sharp.concurrency(1);
-sharp.cache(false);
+sharp.concurrency(0);
+sharp.cache({
+  memory: 50,
+  files: 20,
+  items: 100
+});
 
 // AWS SDK v3 for Cloudflare R2
 import {
@@ -260,10 +264,13 @@ async function uploadLocalFolderToR2() {
         await sharp(filePath)
           .rotate() // 🔥 fixes portrait/landscape EXIF issues
           .resize({
-            width: 400,
+            width: 320,
             withoutEnlargement: true
           })
-          .webp({ quality: 75 })
+          .webp({
+            quality: 58,
+            effort: 4
+          })
           .toFile(thumbPath);
 
         await retry(() =>

@@ -100,76 +100,138 @@
   </script>
 </head>
 
-<body>
-<header class="header">
-  <div class="header-overlay">
+<body class="premium-image-page">
 
-    <a href="/index.html" class="logo">Pixeora</a>
+<header class="premium-search-header" id="premiumHeader">
 
-    <div class="search-bar-wrapper">
-      <div class="search-bar-border">
-        <form class="search-bar" id="searchForm">
-          <input type="text" id="searchInput" placeholder="Search Image" required>
-          <button type="submit" class="search-icon">
-            <img src="/images/search-icon.png" alt="Search" loading="lazy">
-          </button>
-        </form>
-      </div>
+  <div class="search-header-inner">
+
+    <a href="/" class="search-logo">
+      Pixeora
+    </a>
+
+    <nav class="search-nav">
+      <a href="/">Home</a>
+      <a href="/explore.html">Explore</a>
+      <a href="/collections.html">Collections</a>
+      <a href="/community.html">Community</a>
+      <a href="/blog.html">Blog</a>
+    </nav>
+
+    <div class="search-actions">
+
+      <a href="/upload.html" class="upload-btn-link">
+        Upload
+      </a>
+
+      <a href="/login.html" class="login-btn-link">
+        Login
+      </a>
+
+      <a href="/join.html" class="join-btn-link">
+        Join
+      </a>
+
     </div>
 
-    <a href="/legal.html" class="legal-link-header">Legal & Policies</a>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-hero image-search-hero">
+
+    <form class="premium-search-form" id="searchForm">
+
+      <div class="premium-search-icon">
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="20" y1="20" x2="16.5" y2="16.5"></line>
+        </svg>
+      </div>
+
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search wallpapers, photos, backgrounds..."
+        required
+      >
+
+      <select class="premium-select">
+        <option>Wallpapers</option>
+        <option>Photos</option>
+      </select>
+
+      <button type="submit" class="premium-search-btn">
+        Search
+      </button>
+
+    </form>
 
   </div>
+
 </header>
 
-<section class="categories">
+<!-- CATEGORY STRIP -->
+<section class="categories modern-categories">
+
   <div class="category-grid">
-    <a href="/nature.html" class="category">Nature</a>
-    <a href="/business.html" class="category">Business</a>
-    <a href="/technology.html" class="category">Technology</a>
-    <a href="/travel.html" class="category">Travel</a>
-    <a href="/food.html" class="category">Food</a>
-    <a href="/architecture.html" class="category">Architecture</a>
-    <a href="/fashion.html" class="category">Fashion</a>
-    <a href="/abstract.html" class="category">Abstract</a>
-    <a href="/anime.html" class="category">Anime</a>
+
+    <a href="/nature.html" class="category active">
+      Nature
+    </a>
+
+    <a href="/business.html" class="category">
+      Business
+    </a>
+
+    <a href="/technology.html" class="category">
+      Technology
+    </a>
+
+    <a href="/travel.html" class="category">
+      Travel
+    </a>
+
+    <a href="/food.html" class="category">
+      Food
+    </a>
+
+    <a href="/architecture.html" class="category">
+      Architecture
+    </a>
+
+    <a href="/fashion.html" class="category">
+      Fashion
+    </a>
+
+    <a href="/abstract.html" class="category">
+      Abstract
+    </a>
+
+    <a href="/anime.html" class="category">
+      Anime
+    </a>
+
   </div>
-</section>
 
-<!-- 🔥 TOP PHOTO PAGE AD -->
-<section class="ad-section ad-photo-top">
-  <ins class="adsbygoogle"
-      style="display:block"
-      data-ad-client="ca-pub-4549865852809903"
-      data-ad-slot="1551401768"
-      data-ad-format="auto"
-      data-full-width-responsive="true"></ins>
 </section>
-
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
 
 <div class="page-wrapper">
+
   <main>
 
-    <!-- ======================================
-         WALLPAPER LAYOUT
-    ======================================= -->
+    <!-- ========================= -->
+    <!-- MAIN IMAGE LAYOUT -->
+    <!-- ========================= -->
 
     <section class="wallpaper-layout">
 
       <div class="wallpaper-container">
 
-        <!-- ======================================
-             LEFT SIDE IMAGE
-        ======================================= -->
-
+        <!-- LEFT IMAGE -->
         <div class="wallpaper-image">
 
           <div class="image-section">
 
-            <!-- 🔒 MAIN IMAGE -->
             <div class="protected-wrapper">
 
               <div id="main-skeleton" class="skeleton"></div>
@@ -186,113 +248,176 @@
 
               <div id="image-protect-overlay"></div>
 
+              <!-- FLOATING ACTIONS -->
+              <div class="floating-image-actions">
+
+                <button class="floating-icon-btn">
+                  ❤
+                </button>
+
+                <button
+                  class="floating-icon-btn"
+                  onclick="downloadImage(window.__originalFileName)"
+                >
+                  ⤓
+                </button>
+
+                <button class="floating-icon-btn" id="openShareModal">
+                  ↗
+                </button>
+
+              </div>
+
             </div>
+
+          </div>
+
+          <!-- TOP TAGS -->
+          <div class="top-tags-row">
+
+            <% keywords.slice(0,8).forEach(k => { %>
+
+              <a
+                href="/search.html?query=<%= encodeURIComponent(k) %>"
+                class="top-tag-chip"
+              >
+                <%= k %>
+              </a>
+
+            <% }) %>
 
           </div>
 
         </div>
 
-        <!-- ======================================
-             RIGHT SIDE DETAILS
-        ======================================= -->
+        <!-- RIGHT SIDEBAR -->
+        <aside class="wallpaper-details">
 
-        <div class="wallpaper-details">
+          <div class="details-sticky">
 
-          <!-- TITLE -->
-          <h1><%= title %></h1>
+            <h1><%= title %></h1>
 
-          <!-- DESCRIPTION -->
-          <p id="seo-description" class="seo-desc">
-            <%= desc %>
-          </p>
+            <p id="seo-description" class="seo-desc">
+              <%= desc %>
+            </p>
 
-          <!-- ACTION BUTTONS -->
-          <div class="image-actions">
-
-            <div class="left-actions">
-
-              <button class="info-btn">
-                <i class="fas fa-info-circle"></i> Info
-              </button>
-
-              <button class="share-btn" id="openShareModal">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 5.35064 15.0602 5.6872 15.1707 6L8.91 9.13C8.36 8.43 7.52 8 6.58 8C4.92 8 3.58 9.34 3.58 11C3.58 12.66 4.92 14 6.58 14C7.52 14 8.36 13.57 8.91 12.87L15.17 16C15.06 16.31 15 16.65 15 17C15 18.66 16.34 20 18 20C19.66 20 21 18.66 21 17C21 15.34 19.66 14 18 14C17.06 14 16.22 14.43 15.67 15.13L9.41 12C9.52 11.69 9.58 11.35 9.58 11C9.58 10.65 9.52 10.31 9.41 10L15.67 6.87C16.22 7.57 17.06 8 18 8Z" fill="currentColor"/>
-                </svg>
-              </button>
-
-            </div>
-
+            <!-- DOWNLOAD -->
             <a
               id="download-link"
-              class="download-btn"
+              class="download-btn premium-download-btn"
               href="#"
               download="<%= title %>.jpg"
             >
-              <i class="fas fa-download"></i> Download
+              Free Download
             </a>
 
+            <!-- ACTIONS -->
+            <div class="sidebar-actions">
+
+              <button class="info-btn">
+                Info
+              </button>
+
+              <button class="share-btn" id="openShareModal">
+                Share
+              </button>
+
+            </div>
+
+            <!-- META -->
+            <div class="premium-meta-grid">
+
+              <div class="meta-box">
+                <span>Resolution</span>
+                <strong>
+                  <%= width %> × <%= height %>
+                </strong>
+              </div>
+
+              <div class="meta-box">
+                <span>Format</span>
+                <strong>JPG</strong>
+              </div>
+
+              <div class="meta-box">
+                <span>License</span>
+                <strong>Free Use</strong>
+              </div>
+
+              <div class="meta-box">
+                <span>Quality</span>
+                <strong>4K Ultra HD</strong>
+              </div>
+
+            </div>
+
+            <!-- TAGS -->
+            <div class="detail-group">
+
+              <div class="detail-label">
+                Tags
+              </div>
+
+              <div class="detail-tags">
+
+                <% keywords.slice(0,12).forEach(k => { %>
+
+                  <a href="/search.html?query=<%= encodeURIComponent(k) %>">
+                    <%= k %>
+                  </a>
+
+                <% }) %>
+
+              </div>
+
+            </div>
+
+            <!-- AUTHOR -->
+            <div class="creator-card">
+
+              <div class="creator-avatar">
+                P
+              </div>
+
+              <div class="creator-info">
+
+                <strong>
+                  Pixeora Creator
+                </strong>
+
+                <span>
+                  Premium Stock Images
+                </span>
+
+              </div>
+
+            </div>
+
           </div>
 
-          <!-- IMAGE DETAILS -->
-          <div class="detail-group">
-
-            <div class="detail-label">
-              Image Details
-            </div>
-
-            <div class="detail-tags">
-
-              <span>
-                <%= width %> × <%= height %>
-              </span>
-
-              <span>
-                JPG
-              </span>
-
-              <a href="#">
-                High Quality
-              </a>
-
-            </div>
-
-          </div>
-
-          <!-- KEYWORDS -->
-          <div class="detail-group">
-
-            <div class="detail-label">
-              Tags
-            </div>
-
-            <div class="detail-tags">
-
-              <% keywords.slice(0,5).forEach(k => { %>
-
-                <a href="/search.html?query=<%= encodeURIComponent(k) %>">
-                  <%= k %>
-                </a>
-
-              <% }) %>
-
-            </div>
-
-          </div>
-
-        </div>
+        </aside>
 
       </div>
 
     </section>
 
-    <!-- ======================================
-         RELATED IMAGES
-    ======================================= -->
+    <!-- ========================= -->
+    <!-- RELATED -->
+    <!-- ========================= -->
 
-    <div class="related-wrapper">
+    <section class="related-wrapper">
 
-      <h2>Similar Images</h2>
+      <div class="related-header">
+
+        <h2>
+          More Like This
+        </h2>
+
+        <a href="/explore.html" class="view-all-link">
+          View all
+        </a>
+
+      </div>
 
       <div id="related-images" class="masonry-grid">
 
@@ -303,58 +428,27 @@
 
       </div>
 
-    </div>
+    </section>
 
   </main>
+
 </div>
 
-<noscript>
-  <p>
-    <%= title %>
-  </p>
-</noscript>
-
-<!-- 🔥 KEYWORDS AD -->
-<section class="ad-section ad-photo-mid">
-  <ins class="adsbygoogle"
-      style="display:block"
-      data-ad-client="ca-pub-4549865852809903"
-      data-ad-slot="2074145941"
-      data-ad-format="rectangle"></ins>
-</section>
-
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-<button id="goTopBtn" aria-label="Go to top">
-  <svg class="arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M8 5l8 7-8 7" />
-  </svg>
-</button>
-
-<!-- INFO MODAL -->
-<div id="infoModal" class="info-modal">
-  <div class="info-content">
-    <span class="close-btn">&times;</span>
-    <h2>Image Information</h2>
-    <ul>
-      <li><strong>Name:</strong> <span id="info-name">-</span></li>
-      <li><strong>Dimensions:</strong> <span id="info-dimensions">-</span></li>
-      <li><strong>File Size:</strong> <span id="info-size">-</span></li>
-      <li><strong>Format:</strong> <span id="info-format">-</span></li>
-      <li><strong>License:</strong> Free to use for commercial and personal purposes</li>
-    </ul>
-  </div>
-</div>
-
+<!-- SHARE MODAL -->
 <div class="share-modal" id="shareModal">
 
   <div class="share-content">
 
     <div class="share-header">
-      <h3>Share Image</h3>
-      <button class="close-share" id="closeShareModal">×</button>
+
+      <h3>
+        Share Image
+      </h3>
+
+      <button class="close-share" id="closeShareModal">
+        ×
+      </button>
+
     </div>
 
     <div class="share-grid">
@@ -400,31 +494,54 @@
 
 </div>
 
-<!-- 🔥 SMART LEGAL BAR -->
+<button id="goTopBtn" aria-label="Go to top">
+
+  <svg class="arrow-icon" viewBox="0 0 24 24">
+    <path d="M8 5l8 7-8 7" />
+  </svg>
+
+</button>
+
+<!-- LEGAL -->
 <div id="legalBar">
+
   <div class="legal-inner">
-    <span>© 2026 Pixeora • Free stock images for personal & commercial use</span>
+
+    <span>
+      © 2026 Pixeora • Free stock images for personal & commercial use
+    </span>
+
     <div class="legal-links">
+
       <a href="/cookies.html">Cookies</a>
       <a href="/privacy-policy.html">Privacy</a>
       <a href="/terms.html">Terms</a>
       <a href="/dmca.html">DMCA</a>
       <a href="/contact.html">Contact</a>
+
     </div>
+
   </div>
+
 </div>
 
 <div id="cookie-banner" class="premium-cookie">
+
   <div class="cookie-content">
+
     <p class="cookie-message">
       We use cookies to enhance your browsing experience and analyze traffic.
     </p>
-    <button id="cookie-accept" class="cookie-btn-premium">Got it</button>
+
+    <button id="cookie-accept" class="cookie-btn-premium">
+      Got it
+    </button>
+
   </div>
+
 </div>
 
 </body>
-
 
 <script>
 /* ---------------------------------- */
@@ -793,6 +910,28 @@ document.getElementById("copyShareBtn").onclick = async () => {
   },2000);
 };
 
+const premiumHeader =
+document.getElementById("premiumHeader");
+
+let lastScroll = 0;
+
+window.addEventListener("scroll", () => {
+
+  const currentScroll = window.pageYOffset;
+
+  if(currentScroll > lastScroll && currentScroll > 120){
+
+    premiumHeader.classList.add("hide");
+
+  }else{
+
+    premiumHeader.classList.remove("hide");
+
+  }
+
+  lastScroll = currentScroll;
+
+});
 /* ---------------------------------- */
 /* RELATED SYSTEM – STABLE + SEARCH MATCH */
 /* ---------------------------------- */
@@ -1056,6 +1195,7 @@ window.addEventListener("scroll", async () => {
     if (!loaded) loadNextKeywordBatch();
   }
 });
+
 
 /* ---------------------------------- */
 /* LAZY LOADING */
