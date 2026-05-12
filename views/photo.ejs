@@ -1831,6 +1831,22 @@ if (legalBar) {
 
 }
 
+function redirectSearch() {
+
+  const q =
+  document
+  .getElementById("searchInput")
+  .value
+  .trim();
+
+  if (!q) return false;
+
+  window.location.href =
+  `/search.html?query=${encodeURIComponent(q)}`;
+
+  return false;
+}
+
 const revealElements = document.querySelectorAll(".reveal-on-scroll");
 
 loadImageDetails().catch(err => {
