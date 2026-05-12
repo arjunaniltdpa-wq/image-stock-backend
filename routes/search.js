@@ -87,7 +87,8 @@ router.get(
       for (const img of images) {
 
         if (
-          !img.thumbnailFileName
+          !img.thumbnailFileName &&
+          !img.fileName
         ) continue;
 
         if (
@@ -110,8 +111,8 @@ router.get(
 
           fileName: img.fileName,
 
-          thumbnailUrl:
-          `${CDN}/thumbs/${img.thumbnailFileName}`
+          thumbnailFileName:
+          img.thumbnailFileName
 
         });
 
@@ -244,7 +245,8 @@ router.get(
       for (const img of images) {
 
         if (
-          !img.thumbnailFileName
+          !img.thumbnailFileName &&
+          !img.fileName
         ) continue;
 
         if (
@@ -267,8 +269,8 @@ router.get(
 
           fileName: img.fileName,
 
-          thumbnailUrl:
-          `${CDN}/thumbs/${img.thumbnailFileName}`
+          thumbnailFileName:
+          img.thumbnailFileName
 
         });
 
