@@ -19,13 +19,20 @@
   <meta property="og:title" content="<%= title %>">
   <meta property="og:description" content="<%= desc %>">
 
-  <meta property="og:image" content="<%= ogPinterest %>">
-  <meta property="og:image:width" content="<%= pinterestWidth %>">
-  <meta property="og:image:height" content="<%= pinterestHeight %>">
+  <%
+  const seoImage =
+  previewFileName
+  ? previewUrl
+  : originalUrl;
+  %>
 
-  <meta property="og:image" content="<%= ogDefault %>">
+  <meta property="og:image" content="<%= seoImage %>">
   <meta property="og:image:width" content="<%= width %>">
   <meta property="og:image:height" content="<%= height %>">
+
+  <meta name="twitter:image" content="<%= seoImage %>">
+
+  <link rel="image_src" href="<%= seoImage %>">
 
   <meta name="twitter:card" content="summary_large_image">   
   <!-- DO NOT define og:image here -->
@@ -49,9 +56,7 @@
   <link
     rel="preload"
     as="image"
-    href="<%= previewUrl %>">
-
-  <link rel="image_src" href="<%= previewUrl %>">
+    href="<%= previewFileName ? previewUrl : originalUrl %>">
     
   <!-- Performance -->
   <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
@@ -73,8 +78,8 @@
     "@type":"ImageObject",
     "name":"<%= title %>",
     "description":"<%= desc %>",
-    "contentUrl":"<%= previewUrl %>",
-    "thumbnailUrl":"<%= thumbUrl %>",
+    "contentUrl":"<%= previewFileName ? previewUrl : originalUrl %>",
+    "thumbnailUrl":"<%= previewFileName ? previewUrl : originalUrl %>",
     "url":"https://pixeora.com/photo/<%= raw %>",
     "width":"<%= width %>",
     "height":"<%= height %>"
@@ -143,13 +148,11 @@
   <!-- SEARCH HERO -->
   <div class="search-hero">
 
-    <form class="premium-search-form" onsubmit="return redirectSearch()">
-
-      <form
-        id="searchForm"
-        class="premium-search-form"
-        onsubmit="return redirectSearch()"
-      >
+    <form
+      id="searchForm"
+      class="premium-search-form"
+      onsubmit="return redirectSearch()"
+    >
 
       <!-- SEARCH ICON -->
       <div class="premium-search-icon">
@@ -758,9 +761,15 @@ async function loadImageDetails() {
       ? `https://cdn.pixeora.com/${file}`
       : (img.url || "");    
 
-    const linkImg = document.createElement("link");
+    const seoImage =
+    previewUrl || originalUrl;
+
+    const linkImg =
+    document.createElement("link");
+
     linkImg.rel = "image_src";
-    linkImg.href = previewUrl || originalUrl;
+
+    linkImg.href = seoImage;
     document.head.appendChild(linkImg);
 
     const mainImg = document.getElementById("download-image");
@@ -849,7 +858,7 @@ async function loadImageDetails() {
       "name": safeTitle,
       "description": img.description || safeTitle,
 
-      "contentUrl": originalUrl || previewUrl,
+      "contentUrl": previewUrl || originalUrl,
       "thumbnailUrl": thumbUrl,
 
       "url": window.location.href,
@@ -907,7 +916,7 @@ async function loadImageDetails() {
     // 👉 Load ORIGINAL image only for dimension accuracy
     if (originalUrl) {
       const dimImg = new Image();
-      dimImg.src = originalUrl;
+      dimImg.src = previewUrl || originalUrl;
 
       dimImg.onload = () => {
         if (dimImg.naturalWidth && dimImg.naturalHeight) {
