@@ -74,6 +74,7 @@ router.get(
         width
         height
         thumbnailFileName
+        fileName
       `)
 
       .limit(limit)
@@ -106,6 +107,8 @@ router.get(
           width: img.width,
 
           height: img.height,
+
+          fileName: img.fileName,
 
           thumbnailUrl:
           `${CDN}/thumbs/${img.thumbnailFileName}`
@@ -227,6 +230,8 @@ router.get(
         width
         height
         thumbnailFileName
+        fileName
+
       `)
 
       .limit(limit)
@@ -259,6 +264,8 @@ router.get(
           width: img.width,
 
           height: img.height,
+
+          fileName: img.fileName,
 
           thumbnailUrl:
           `${CDN}/thumbs/${img.thumbnailFileName}`
