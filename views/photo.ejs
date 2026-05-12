@@ -145,6 +145,12 @@
 
     <form class="premium-search-form" onsubmit="return redirectSearch()">
 
+      <form
+        id="searchForm"
+        class="premium-search-form"
+        onsubmit="return redirectSearch()"
+      >
+
       <!-- SEARCH ICON -->
       <div class="premium-search-icon">
 
@@ -948,13 +954,30 @@ window.addEventListener("scroll", () => {
 const container =
 document.querySelector(".image-section");
 
-if (image.height > image.width) {
+const mainImage =
+document.getElementById("download-image");
 
-  container.classList.add("portrait");
+if (mainImage) {
 
-} else {
+  mainImage.onload = () => {
 
-  container.classList.remove("portrait");
+    const container =
+    document.querySelector(".image-section");
+
+    if (
+      mainImage.naturalHeight >
+      mainImage.naturalWidth
+    ) {
+
+      container.classList.add("portrait");
+
+    } else {
+
+      container.classList.remove("portrait");
+
+    }
+
+  };
 
 }
 /* =====================================================
@@ -1420,14 +1443,24 @@ function displayRelated(
 
     relatedImageCounter++;
 
-    const thumb =
-
-      img.thumbnailFileName
-      || img.fileName;
-
     const imageUrl =
-    `https://cdn.pixeora.com/${encodeURIComponent(thumb)}`;
 
+    img.thumbnailFileName
+
+    ? `https://cdn.pixeora.com/${encodeURIComponent(img.thumbnailFileName)}`
+
+    : img.previewFileName
+
+    ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
+
+    : img.fileName
+
+    ? `https://cdn.pixeora.com/${encodeURIComponent(img.fileName)}`
+
+    : "";
+
+    if (!imageUrl) return;
+    
     const card =
     document.createElement("a");
 
@@ -1443,9 +1476,13 @@ function displayRelated(
 
         <img
           src="${imageUrl}"
-          alt="${img.title}"
+          alt="${img.title || ''}"
           loading="lazy"
           class="related-image"
+          onerror="
+            this.onerror=null;
+            this.src='https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName || img.fileName || '')}';
+          "
         />
 
         <button class="related-download">

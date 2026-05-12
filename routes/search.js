@@ -89,7 +89,6 @@ router.get(
       .skip(skip)
 
       .limit(limit)
-
       .select(`
         _id
         slug
@@ -97,6 +96,7 @@ router.get(
         width
         height
         thumbnailFileName
+        previewFileName
         fileName
       `)
 
