@@ -953,50 +953,76 @@ window.addEventListener("scroll", () => {
   lastScroll = currentScroll;
 
 });
-/* ---------------------------------- */
-/* RELATED SYSTEM – STABLE + SEARCH MATCH */
-/* ---------------------------------- */
+
+const container =
+document.querySelector(".image-section");
+
+if (image.height > image.width) {
+
+  container.classList.add("portrait");
+
+} else {
+
+  container.classList.remove("portrait");
+
+}
+/* =====================================================
+   RELATED SYSTEM
+===================================================== */
 
 let relatedKeywordList = [];
 let relatedKeywordIndex = 0;
-let relatedPage = 1;
+
 let relatedLoading = false;
-let loadedIds = new Set();
+
+let relatedPage = 1;
+
 let relatedColIndex = 0;
-let relatedCursor = null;
+
 let relatedImageCounter = 0;
 
-/* Helper slug */
-function slugify(text = "") {
-  return text.toString().toLowerCase()
-    .replace(/[^\w ]+/g, "")
-    .replace(/\s+/g, "-")
-    .trim();
-}
+const loadedIds = new Set();
 
-function startRelatedSystem(keywords = [], imageData = {}) {
+/* =====================================================
+   START RELATED
+===================================================== */
+
+function startRelatedSystem(
+  keywords = [],
+  imageData = {}
+) {
+
+  relatedKeywordIndex = 0;
+
+  relatedPage = 1;
+
+  relatedLoading = false;
 
   relatedColIndex = 0;
-  relatedKeywordIndex = 0;
-  relatedPage = 1;
-  relatedLoading = false;
-  relatedCursor = null;
-
-  loadedIds.clear();
 
   relatedImageCounter = 0;
 
+  loadedIds.clear();
+
   const grid =
-  document.querySelector("#related-images");
+  document.querySelector(
+    "#related-images"
+  );
 
   if (!grid) return;
 
   grid.innerHTML = `
+
     <div class="masonry-col"></div>
     <div class="masonry-col"></div>
     <div class="masonry-col"></div>
     <div class="masonry-col"></div>
+
   `;
+
+  /* ---------------------------------- */
+  /* SKELETONS */
+  /* ---------------------------------- */
 
   for (let i = 0; i < 8; i++) {
 
@@ -1009,15 +1035,17 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   }
 
   const title =
-  (imageData.title || "")
-  .toLowerCase();
+  (
+    imageData.title || ""
+  ).toLowerCase();
 
   const file =
-  (imageData.fileName || "")
-  .toLowerCase();
+  (
+    imageData.fileName || ""
+  ).toLowerCase();
 
   /* ---------------------------------- */
-  /* CLEAN WORDS */
+  /* REMOVE JUNK WORDS */
   /* ---------------------------------- */
 
   const banned = [
@@ -1038,9 +1066,11 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   ];
 
   const words =
-  (title || file)
+
+  `${title} ${file}`
 
   .replace(/[^\w ]+/g, "")
+
   .split(" ")
 
   .filter(w =>
@@ -1052,7 +1082,113 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   );
 
   /* ---------------------------------- */
-  /* EXACT VISUAL STYLE */
+  /* CATEGORY DETECTION */
+  /* ---------------------------------- */
+
+  const carWords = [
+
+    "car",
+    "cars",
+    "hypercar",
+    "supercar",
+    "bmw",
+    "audi",
+    "mercedes",
+    "porsche",
+    "ferrari",
+    "lamborghini",
+    "mclaren",
+    "vehicle"
+
+  ];
+
+  const animeWords = [
+
+    "anime",
+    "naruto",
+    "dragon",
+    "fairy",
+    "manga",
+    "waifu",
+    "demon",
+    "natsu",
+    "goku"
+
+  ];
+
+  const natureWords = [
+
+    "nature",
+    "forest",
+    "waterfall",
+    "ocean",
+    "reef",
+    "underwater",
+    "flower",
+    "bird",
+    "mountain"
+
+  ];
+
+  let category = "";
+
+  if (
+    words.some(w =>
+      carWords.includes(w)
+    )
+  ) {
+
+    category = "cars";
+
+  }
+
+  else if (
+    words.some(w =>
+      animeWords.includes(w)
+    )
+  ) {
+
+    category = "anime";
+
+  }
+
+  else if (
+    words.some(w =>
+      natureWords.includes(w)
+    )
+  ) {
+
+    category = "nature";
+
+  }
+
+  /* ---------------------------------- */
+  /* VISUAL STYLE */
+  /* ---------------------------------- */
+
+  const styleWords = [
+
+    "dark",
+    "neon",
+    "purple",
+    "blue",
+    "red",
+    "orange",
+    "cinematic",
+    "fantasy",
+    "glow",
+    "night"
+
+  ];
+
+  const detectedStyles =
+
+  words.filter(w =>
+    styleWords.includes(w)
+  );
+
+  /* ---------------------------------- */
+  /* STRONGEST TERMS */
   /* ---------------------------------- */
 
   const exactTheme =
@@ -1065,45 +1201,27 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   keywords[0] || "";
 
   /* ---------------------------------- */
-  /* COLOR / STYLE DETECTION */
-  /* ---------------------------------- */
-
-  const colorKeywords = [
-
-    "dark",
-    "neon",
-    "cyberpunk",
-    "red",
-    "blue",
-    "purple",
-    "green",
-    "orange",
-    "gold",
-    "fire",
-    "night",
-    "sunset",
-    "cinematic",
-    "fantasy",
-    "anime",
-    "realistic"
-
-  ];
-
-  const detectedStyles =
-  words.filter(w =>
-    colorKeywords.includes(w)
-  );
-
-  /* ---------------------------------- */
   /* FINAL PRIORITY */
   /* ---------------------------------- */
 
   relatedKeywordList = [
 
-    exactTheme,        // strongest
-    visualTheme,       // visual match
+    `${category} ${exactTheme}`.trim(),
+
+    `${category} ${visualTheme}`.trim(),
+
     `${subject} ${detectedStyles.join(" ")}`.trim(),
+
+    `${category} ${subject}`.trim(),
+
+    category,
+
+    exactTheme,
+
+    visualTheme,
+
     subject,
+
     ...keywords
 
   ].filter(Boolean);
@@ -1111,17 +1229,13 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   relatedKeywordList =
   [...new Set(relatedKeywordList)];
 
-  if (!relatedKeywordList.length) {
-
-    loadRelatedFallback();
-    return;
-
-  }
-
   loadNextKeywordBatch();
 }
 
-/* LOAD FIRST KEYWORD */
+/* =====================================================
+   LOAD KEYWORD
+===================================================== */
+
 async function loadNextKeywordBatch() {
 
   if (
@@ -1129,80 +1243,90 @@ async function loadNextKeywordBatch() {
     relatedKeywordList.length
   ) {
 
-    // 🔥 FALLBACK AUTOMATICALLY
-    await loadRelatedFallback();
     return;
   }
 
   const keyword =
-    relatedKeywordList[
-      relatedKeywordIndex++
-    ];
 
-  relatedCursor = null;
+  relatedKeywordList[
+    relatedKeywordIndex++
+  ];
+
   relatedPage = 1;
 
-  const loaded =
-    await loadMoreRelated(keyword);
+  let loaded = false;
 
-  // 🔥 If failed → next keyword
+  while (
+    relatedPage <= 4 &&
+    !loaded
+  ) {
+
+    loaded =
+    await loadMoreRelated(
+      keyword
+    );
+
+    relatedPage++;
+  }
+
   if (!loaded) {
 
     loadNextKeywordBatch();
-
   }
-
 }
-/* LOAD MORE */
-async function loadMoreRelated(keyword) {
 
-  if (relatedLoading) return true;
+/* =====================================================
+   LOAD RELATED
+===================================================== */
+
+async function loadMoreRelated(
+  keyword
+) {
+
+  if (relatedLoading)
+  return true;
 
   relatedLoading = true;
 
   try {
 
-    const limit =
+    const url =
 
-    relatedImageCounter < 12
-    ? 14
-    : 20;
-
-    const url = relatedCursor
-
-    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(keyword)}&cursor=${relatedCursor}&limit=${limit}`
-
-    : `${API_BASE}/api/search/first?q=${encodeURIComponent(keyword)}&limit=${limit}`;
+    `${API_BASE}/api/search?q=${encodeURIComponent(keyword)}&page=${relatedPage}`;
 
     const res =
     await fetch(url);
 
     if (!res.ok)
-    throw new Error("Search failed");
+    throw new Error(
+      "Search failed"
+    );
 
     const data =
     await res.json();
-
-    relatedCursor =
-    data.nextCursor || null;
 
     let images =
     data.images || [];
 
     /* ---------------------------------- */
-    /* STRICT FILTER FIRST 12 */
+    /* STRICT MATCHING FIRST */
     /* ---------------------------------- */
 
-    if (relatedImageCounter < 12) {
+    if (
+      relatedImageCounter < 16
+    ) {
 
       const q =
       keyword.toLowerCase();
 
-      images = images.filter(img => {
+      images =
+
+      images.filter(img => {
 
         const t =
-        (img.title || "")
-        .toLowerCase();
+        (
+          img.title || ""
+        ).toLowerCase();
 
         return q
         .split(" ")
@@ -1211,7 +1335,6 @@ async function loadMoreRelated(keyword) {
         );
 
       });
-
     }
 
     /* ---------------------------------- */
@@ -1219,15 +1342,21 @@ async function loadMoreRelated(keyword) {
     /* ---------------------------------- */
 
     const unique =
+
     images.filter(img => {
 
       const id =
       img._id || img.id;
 
-      if (!id) return false;
-
-      if (loadedIds.has(id))
+      if (!id)
       return false;
+
+      if (
+        loadedIds.has(id)
+      ) {
+
+        return false;
+      }
 
       loadedIds.add(id);
 
@@ -1238,8 +1367,8 @@ async function loadMoreRelated(keyword) {
     if (!unique.length) {
 
       relatedLoading = false;
-      return false;
 
+      return false;
     }
 
     displayRelated(unique);
@@ -1248,138 +1377,102 @@ async function loadMoreRelated(keyword) {
 
     return true;
 
-  } catch (e) {
+  } catch (err) {
+
+    console.error(
+      "RELATED ERROR:",
+      err
+    );
 
     relatedLoading = false;
 
     return false;
-
   }
-
 }
 
-let colIndex = 0;
-function displayRelated(images) {
+/* =====================================================
+   DISPLAY RELATED
+===================================================== */
 
-  if (!images || !images.length) return;
+function displayRelated(
+  images = []
+) {
 
+  const grid =
+  document.querySelector(
+    "#related-images"
+  );
 
-  const masonry =
-    document.getElementById("related-images");
-
-  if (!masonry) {
-    console.error("related-images not found");
-    return;
-  }
-
-  document
-  .querySelectorAll(".related-skeleton")
-  .forEach(el => el.remove());
+  if (!grid) return;
 
   const cols =
-    masonry.querySelectorAll(".masonry-col");
+  grid.querySelectorAll(
+    ".masonry-col"
+  );
 
-  images.forEach((img, index) => {
+  document
+  .querySelectorAll(
+    ".related-skeleton"
+  )
+  .forEach(el =>
+    el.remove()
+  );
 
-    if (relatedImageCounter >= 80) return;
+  images.forEach(img => {
+
+    const col =
+    cols[
+      relatedColIndex % 4
+    ];
+
+    relatedColIndex++;
 
     relatedImageCounter++;
 
-    if (
-      !img ||
-      (
-        !img.thumbnailFileName &&
-        !img.previewFileName &&
-        !img.fileName
-      )
-    ) return;
+    const thumb =
 
-    const finalSlug =
-      img.slug
-        ? img.slug
-        : `${slugify(img.title || "image")}-${img._id}`;
+      img.thumbnailFileName
+      || img.fileName;
 
-    // 🔥 thumbnail priority
-    /* STRICT FAST THUMBNAILS */
+    const imageUrl =
 
-    let imageUrl = "";
-
-    if (img.thumbnailFileName) {
-
-      imageUrl =
-      `https://cdn.pixeora.com/${encodeURIComponent(
-        img.thumbnailFileName
-      )}`;
-
-    } else {
-
-      /* fallback ONLY if thumbnail missing */
-
-      imageUrl =
-      `https://cdn.pixeora.com/${encodeURIComponent(
-        img.fileName
-      )}`;
-    }
-
-    const fastLoad =
-    relatedImageCounter <= 8;
+    `${CDN}/${thumb}`;
 
     const card =
-      document.createElement("div");
+    document.createElement("a");
 
-    card.className = "image-item";
+    card.href =
+    `/photo/${img.slug}`;
+
+    card.className =
+    "related-card";
 
     card.innerHTML = `
 
-      <div class="image-wrapper">
-
-        <a href="/photo/${finalSlug}">
-
-          <img
-            src="${imageUrl}"
-            alt="${img.title || ""}"
-
-            loading="${fastLoad ? "eager" : "lazy"}"
-            fetchpriority="${fastLoad ? "high" : "low"}"
-            decoding="async"
-
-            width="${img.width || 600}"
-            height="${img.height || 800}"
-
-            style="
-              width:100%;
-              height:auto;
-              display:block;
-            "
-          >
-
-        </a>
-
-        <button
-        class="download-overlay"
-        onclick="event.preventDefault(); event.stopPropagation(); downloadImage('${(img.fileName || "").replace(/'/g,"\\\\'")}')"
-        aria-label="Download"
-        >
+      <div class="related-image-wrap">
 
         <img
+          src="${imageUrl}"
+          alt="${img.title}"
+          loading="lazy"
+          class="related-image"
+        />
+
+        <button class="related-download">
+
+          <img
             src="/images/download-icon.png"
-            alt="Download"
-        >
+            alt="download"
+          />
 
         </button>
+
       </div>
 
     `;
 
-    // 🔥 distribute columns
-    requestAnimationFrame(() => {
-
-      cols[index % cols.length]
-      .appendChild(card);
-
-    });
+    col.appendChild(card);
   });
-
 }
 
 /* ---------------------------------- */
