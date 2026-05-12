@@ -234,16 +234,16 @@
     <!-- MAIN IMAGE LAYOUT -->
     <!-- ========================= -->
 
-    <section class="wallpaper-layout">
+    <section class="photo-hero">
 
       <div class="wallpaper-container">
 
         <!-- LEFT IMAGE -->
-        <div class="wallpaper-image">
+        <div class="photo-left">
 
           <div class="image-section">
 
-            <div class="protected-wrapper">
+            <div class="photo-image-wrap">
 
               <div id="main-skeleton" class="skeleton"></div>
 
@@ -302,7 +302,7 @@
         </div>
 
         <!-- RIGHT SIDEBAR -->
-        <aside class="wallpaper-details">
+        <aside class="photo-sidebar">
 
           <div class="details-sticky">
 
@@ -412,15 +412,6 @@
 
     </section>
     
-    <section class="quick-related-scroll">
-
-      <div class="scroll-row">
-
-        related cards here
-
-      </div>
-
-    </section>
 
     <!-- ========================= -->
     <!-- RELATED -->
@@ -1435,8 +1426,7 @@ function displayRelated(
       || img.fileName;
 
     const imageUrl =
-
-    `${CDN}/${thumb}`;
+    `https://cdn.pixeora.com/${encodeURIComponent(thumb)}`;
 
     const card =
     document.createElement("a");
