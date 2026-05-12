@@ -19,20 +19,13 @@
   <meta property="og:title" content="<%= title %>">
   <meta property="og:description" content="<%= desc %>">
 
-  <%
-  const seoImage =
-  previewFileName
-  ? previewUrl
-  : originalUrl;
-  %>
+  <meta property="og:image" content="<%= ogPinterest %>">
+  <meta property="og:image:width" content="<%= pinterestWidth %>">
+  <meta property="og:image:height" content="<%= pinterestHeight %>">
 
-  <meta property="og:image" content="<%= seoImage %>">
+  <meta property="og:image" content="<%= ogDefault %>">
   <meta property="og:image:width" content="<%= width %>">
   <meta property="og:image:height" content="<%= height %>">
-
-  <meta name="twitter:image" content="<%= seoImage %>">
-
-  <link rel="image_src" href="<%= seoImage %>">
 
   <meta name="twitter:card" content="summary_large_image">   
   <!-- DO NOT define og:image here -->
@@ -80,7 +73,7 @@
     "@type":"ImageObject",
     "name":"<%= title %>",
     "description":"<%= desc %>",
-    "contentUrl":"<%= previewFileName ? previewUrl : originalUrl %>",
+    "contentUrl":"<%= previewUrl %>",
     "thumbnailUrl":"<%= thumbUrl %>",
     "url":"https://pixeora.com/photo/<%= raw %>",
     "width":"<%= width %>",
@@ -765,15 +758,9 @@ async function loadImageDetails() {
       ? `https://cdn.pixeora.com/${file}`
       : (img.url || "");    
 
-    const seoImage =
-    previewUrl || originalUrl;
-
-    const linkImg =
-    document.createElement("link");
-
+    const linkImg = document.createElement("link");
     linkImg.rel = "image_src";
-
-    linkImg.href = seoImage;
+    linkImg.href = previewUrl || originalUrl;
     document.head.appendChild(linkImg);
 
     const mainImg = document.getElementById("download-image");
@@ -862,7 +849,7 @@ async function loadImageDetails() {
       "name": safeTitle,
       "description": img.description || safeTitle,
 
-      "contentUrl": previewUrl || originalUrl,
+      "contentUrl": originalUrl || previewUrl,
       "thumbnailUrl": thumbUrl,
 
       "url": window.location.href,
@@ -920,7 +907,7 @@ async function loadImageDetails() {
     // 👉 Load ORIGINAL image only for dimension accuracy
     if (originalUrl) {
       const dimImg = new Image();
-      dimImg.src = previewUrl || originalUrl;
+      dimImg.src = originalUrl;
 
       dimImg.onload = () => {
         if (dimImg.naturalWidth && dimImg.naturalHeight) {
