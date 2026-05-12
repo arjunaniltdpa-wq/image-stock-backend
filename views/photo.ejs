@@ -231,6 +231,93 @@
   </div>
 
 </section>
+<!-- ================================= -->
+<!-- LEFT COLUMN -->
+<!-- ================================= -->
+
+<div class="photo-left">
+
+  <!-- MAIN WHITE BOX -->
+  <div class="photo-image-wrap">
+
+    <!-- FIXED IMAGE AREA -->
+    <div class="photo-image-inner">
+
+      <div
+        id="main-skeleton"
+        class="skeleton"
+      ></div>
+
+      <img
+        id="download-image"
+        src="<%= previewUrl %>"
+        loading="eager"
+        fetchpriority="high"
+        width="<%= width %>"
+        height="<%= height %>"
+        alt="<%= title %>"
+      />
+
+      <div id="image-protect-overlay"></div>
+
+      <!-- FLOATING ACTIONS -->
+      <div class="floating-image-actions">
+
+        <button class="floating-icon-btn">
+          ❤
+        </button>
+
+        <button
+          class="floating-icon-btn"
+          onclick="downloadImage(window.__originalFileName)"
+        >
+          ⤓
+        </button>
+
+        <button
+          class="floating-icon-btn"
+          id="openShareModal"
+        >
+          ↗
+        </button>
+
+      </div>
+
+    </div>
+
+    <!-- CONTENT UNDER IMAGE -->
+    <div class="under-image-content">
+
+      <h1 class="under-image-title">
+        <%= title %>
+      </h1>
+
+      <p class="under-image-desc">
+        <%= desc %>
+      </p>
+
+      <!-- TAGS -->
+      <div class="top-tags-row">
+
+        <% keywords.slice(0,8).forEach(k => { %>
+
+          <a
+            href="/search.html?query=<%= encodeURIComponent(k) %>"
+            class="top-tag-chip"
+          >
+            <%= k %>
+          </a>
+
+        <% }) %>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
 <div class="page-wrapper">
 
   <main>
@@ -249,7 +336,7 @@
 
         <div class="photo-left">
 
-          <!-- IMAGE -->
+          <!-- IMAGE CARD -->
           <div class="image-section">
 
             <div class="photo-image-wrap">
@@ -298,6 +385,22 @@
 
           </div>
 
+          <!-- IMAGE INFO UNDER IMAGE -->
+          <div class="under-image-content">
+
+            <h1 class="under-image-title">
+              <%= title %>
+            </h1>
+
+            <p
+              id="seo-description"
+              class="under-image-desc"
+            >
+              <%= desc %>
+            </p>
+
+          </div>
+
           <!-- TAGS -->
           <div class="top-tags-row">
 
@@ -313,8 +416,8 @@
             <% }) %>
 
           </div>
-        </div> <!-- CLOSE .photo-left -->
 
+        </div>
 
         <!-- ================================= -->
         <!-- RIGHT SIDEBAR -->
@@ -323,17 +426,6 @@
         <aside class="photo-sidebar">
 
           <div class="details-sticky">
-
-            <h1>
-              <%= title %>
-            </h1>
-
-            <p
-              id="seo-description"
-              class="seo-desc"
-            >
-              <%= desc %>
-            </p>
 
             <!-- DOWNLOAD -->
             <a
