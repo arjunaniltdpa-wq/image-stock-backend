@@ -231,27 +231,33 @@
   </div>
 
 </section>
-
 <div class="page-wrapper">
 
   <main>
 
     <!-- ========================= -->
-    <!-- MAIN IMAGE LAYOUT -->
+    <!-- MAIN LAYOUT -->
     <!-- ========================= -->
 
     <section class="photo-hero">
 
       <div class="wallpaper-container">
 
-        <!-- LEFT IMAGE -->
+        <!-- ================================= -->
+        <!-- LEFT COLUMN -->
+        <!-- ================================= -->
+
         <div class="photo-left">
 
+          <!-- IMAGE -->
           <div class="image-section">
 
             <div class="photo-image-wrap">
 
-              <div id="main-skeleton" class="skeleton"></div>
+              <div
+                id="main-skeleton"
+                class="skeleton"
+              ></div>
 
               <img
                 id="download-image"
@@ -279,7 +285,10 @@
                   ⤓
                 </button>
 
-                <button class="floating-icon-btn" id="openShareModal">
+                <button
+                  class="floating-icon-btn"
+                  id="openShareModal"
+                >
                   ↗
                 </button>
 
@@ -289,7 +298,7 @@
 
           </div>
 
-          <!-- TOP TAGS -->
+          <!-- TAGS -->
           <div class="top-tags-row">
 
             <% keywords.slice(0,8).forEach(k => { %>
@@ -305,16 +314,59 @@
 
           </div>
 
+          <!-- ================================= -->
+          <!-- RELATED -->
+          <!-- ================================= -->
+
+          <section class="related-wrapper">
+
+            <div class="related-header">
+
+              <h2>
+                More Like This
+              </h2>
+
+              <a
+                href="/explore.html"
+                class="view-all-link"
+              >
+                View all
+              </a>
+
+            </div>
+
+            <div
+              id="related-images"
+              class="masonry-grid"
+            >
+
+              <div class="masonry-col"></div>
+              <div class="masonry-col"></div>
+              <div class="masonry-col"></div>
+              <div class="masonry-col"></div>
+
+            </div>
+
+          </section>
+
         </div>
 
+        <!-- ================================= -->
         <!-- RIGHT SIDEBAR -->
+        <!-- ================================= -->
+
         <aside class="photo-sidebar">
 
           <div class="details-sticky">
 
-            <h1><%= title %></h1>
+            <h1>
+              <%= title %>
+            </h1>
 
-            <p id="seo-description" class="seo-desc">
+            <p
+              id="seo-description"
+              class="seo-desc"
+            >
               <%= desc %>
             </p>
 
@@ -335,7 +387,10 @@
                 Info
               </button>
 
-              <button class="share-btn" id="openShareModal">
+              <button
+                class="share-btn"
+                id="openShareModal"
+              >
                 Share
               </button>
 
@@ -345,25 +400,51 @@
             <div class="premium-meta-grid">
 
               <div class="meta-box">
-                <span>Resolution</span>
+
+                <span>
+                  Resolution
+                </span>
+
                 <strong>
                   <%= width %> × <%= height %>
                 </strong>
+
               </div>
 
               <div class="meta-box">
-                <span>Format</span>
-                <strong>JPG</strong>
+
+                <span>
+                  Format
+                </span>
+
+                <strong>
+                  JPG
+                </strong>
+
               </div>
 
               <div class="meta-box">
-                <span>License</span>
-                <strong>Free Use</strong>
+
+                <span>
+                  License
+                </span>
+
+                <strong>
+                  Free Use
+                </strong>
+
               </div>
 
               <div class="meta-box">
-                <span>Quality</span>
-                <strong>4K Ultra HD</strong>
+
+                <span>
+                  Quality
+                </span>
+
+                <strong>
+                  4K Ultra HD
+                </strong>
+
               </div>
 
             </div>
@@ -389,7 +470,7 @@
 
             </div>
 
-            <!-- AUTHOR -->
+            <!-- CREATOR -->
             <div class="creator-card">
 
               <div class="creator-avatar">
@@ -413,36 +494,6 @@
           </div>
 
         </aside>
-
-      </div>
-
-    </section>
-    
-
-    <!-- ========================= -->
-    <!-- RELATED -->
-    <!-- ========================= -->
-
-    <section class="related-wrapper">
-
-      <div class="related-header">
-
-        <h2>
-          More Like This
-        </h2>
-
-        <a href="/explore.html" class="view-all-link">
-          View all
-        </a>
-
-      </div>
-
-      <div id="related-images" class="masonry-grid">
-
-        <div class="masonry-col"></div>
-        <div class="masonry-col"></div>
-        <div class="masonry-col"></div>
-        <div class="masonry-col"></div>
 
       </div>
 
