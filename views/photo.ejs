@@ -421,7 +421,7 @@
       </div>
 
     </section>
-    
+
     <!-- ========================= -->
     <!-- RELATED -->
     <!-- ========================= -->
@@ -981,10 +981,13 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   relatedPage = 1;
   relatedLoading = false;
   relatedCursor = null;
+
   loadedIds.clear();
+
   relatedImageCounter = 0;
 
-  const grid = document.querySelector("#related-images");
+  const grid =
+  document.querySelector("#related-images");
 
   if (!grid) return;
 
@@ -994,7 +997,8 @@ function startRelatedSystem(keywords = [], imageData = {}) {
     <div class="masonry-col"></div>
     <div class="masonry-col"></div>
   `;
-  for(let i=0;i<8;i++){
+
+  for (let i = 0; i < 8; i++) {
 
     const col =
     grid.children[i % 4];
@@ -1003,64 +1007,116 @@ function startRelatedSystem(keywords = [], imageData = {}) {
       <div class="related-skeleton"></div>
     `;
   }
-  /* Fallback if no keywords */
-  if (!keywords.length && !imageData?.title) {
-    loadRelatedFallback();
-    return;
-  }
+
+  const title =
+  (imageData.title || "")
+  .toLowerCase();
+
+  const file =
+  (imageData.fileName || "")
+  .toLowerCase();
 
   /* ---------------------------------- */
-  /* 🔥 BUILD STRONG SEARCH SIGNAL */
+  /* CLEAN WORDS */
   /* ---------------------------------- */
 
-  const title = (imageData.title || "").toLowerCase();
-  const file = (imageData.fileName || "").toLowerCase();
+  const banned = [
 
-  // Extract strong words from title
-  const words = (title || file)
-    .replace(/[^\w ]+/g, "")
-    .split(" ")
-    .filter(w => w.length > 3);
+    "free",
+    "hd",
+    "4k",
+    "wallpaper",
+    "wallpapers",
+    "background",
+    "backgrounds",
+    "image",
+    "images",
+    "photo",
+    "photos",
+    "pixeora"
 
-  // Remove weak/common words
-  const stopWords = [
-    "with","from","into","this","that","free","image",
-    "photo","wallpaper","background","hd","4k"
   ];
 
-  const filteredWords = words.filter(w => !stopWords.includes(w));
+  const words =
+  (title || file)
 
-  // Pick top 3 strongest words
-  const primaryWords =
-  filteredWords
-  .filter(w => w.length > 4)
-  .slice(0, 5);
+  .replace(/[^\w ]+/g, "")
+  .split(" ")
+
+  .filter(w =>
+
+    w &&
+    w.length > 2 &&
+    !banned.includes(w)
+
+  );
 
   /* ---------------------------------- */
-  /* 🔥 PRIORITY ORDER (VERY IMPORTANT) */
+  /* EXACT VISUAL STYLE */
   /* ---------------------------------- */
 
-  const mainQuery =
-  primaryWords.slice(0, 2).join(" ");
-  const subject = keywords[0] || "";
+  const exactTheme =
+  words.slice(0, 4).join(" ");
+
+  const visualTheme =
+  words.slice(0, 2).join(" ");
+
+  const subject =
+  keywords[0] || "";
+
+  /* ---------------------------------- */
+  /* COLOR / STYLE DETECTION */
+  /* ---------------------------------- */
+
+  const colorKeywords = [
+
+    "dark",
+    "neon",
+    "cyberpunk",
+    "red",
+    "blue",
+    "purple",
+    "green",
+    "orange",
+    "gold",
+    "fire",
+    "night",
+    "sunset",
+    "cinematic",
+    "fantasy",
+    "anime",
+    "realistic"
+
+  ];
+
+  const detectedStyles =
+  words.filter(w =>
+    colorKeywords.includes(w)
+  );
+
+  /* ---------------------------------- */
+  /* FINAL PRIORITY */
+  /* ---------------------------------- */
 
   relatedKeywordList = [
-    mainQuery,              // 🔥 EXACT visual match
-    subject,                // medium relevance
-    ...keywords.slice(1, 5) // weak fallback
+
+    exactTheme,        // strongest
+    visualTheme,       // visual match
+    `${subject} ${detectedStyles.join(" ")}`.trim(),
+    subject,
+    ...keywords
+
   ].filter(Boolean);
 
-  // Remove duplicates
-  relatedKeywordList = [...new Set(relatedKeywordList)];
+  relatedKeywordList =
+  [...new Set(relatedKeywordList)];
 
   if (!relatedKeywordList.length) {
+
     loadRelatedFallback();
     return;
-  }
 
-  /* ---------------------------------- */
-  /* 🚀 START LOADING */
-  /* ---------------------------------- */
+  }
 
   loadNextKeywordBatch();
 }
@@ -1099,55 +1155,107 @@ async function loadNextKeywordBatch() {
 }
 /* LOAD MORE */
 async function loadMoreRelated(keyword) {
+
   if (relatedLoading) return true;
+
   relatedLoading = true;
 
   try {
-  const strongQuery = keyword;
 
-  const limit =
-  relatedImageCounter < 12
-  ? 12
-  : 20;
+    const limit =
 
-  const url = relatedCursor
-  ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=${limit}`
-  : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=${limit}`;
+    relatedImageCounter < 12
+    ? 14
+    : 20;
 
-    if (!keyword || keyword.length < 2) {
-      relatedLoading = false;
-      return false;
+    const url = relatedCursor
+
+    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(keyword)}&cursor=${relatedCursor}&limit=${limit}`
+
+    : `${API_BASE}/api/search/first?q=${encodeURIComponent(keyword)}&limit=${limit}`;
+
+    const res =
+    await fetch(url);
+
+    if (!res.ok)
+    throw new Error("Search failed");
+
+    const data =
+    await res.json();
+
+    relatedCursor =
+    data.nextCursor || null;
+
+    let images =
+    data.images || [];
+
+    /* ---------------------------------- */
+    /* STRICT FILTER FIRST 12 */
+    /* ---------------------------------- */
+
+    if (relatedImageCounter < 12) {
+
+      const q =
+      keyword.toLowerCase();
+
+      images = images.filter(img => {
+
+        const t =
+        (img.title || "")
+        .toLowerCase();
+
+        return q
+        .split(" ")
+        .some(w =>
+          t.includes(w)
+        );
+
+      });
+
     }
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Search API failed");
+    /* ---------------------------------- */
+    /* REMOVE DUPLICATES */
+    /* ---------------------------------- */
 
-    const data = await res.json();
+    const unique =
+    images.filter(img => {
 
-    const images = data.images || [];
-    relatedCursor = data.nextCursor || null;
+      const id =
+      img._id || img.id;
 
-    const unique = images.filter(img => {
-      const id = img._id || img.id;
-      if (!id || loadedIds.has(id)) return false;
+      if (!id) return false;
+
+      if (loadedIds.has(id))
+      return false;
+
       loadedIds.add(id);
-      if (!img._id) img._id = id;
+
       return true;
+
     });
 
     if (!unique.length) {
+
       relatedLoading = false;
       return false;
+
     }
 
     displayRelated(unique);
+
     relatedLoading = false;
+
     return true;
 
   } catch (e) {
+
     relatedLoading = false;
+
     return false;
+
   }
+
 }
 
 let colIndex = 0;
@@ -1239,8 +1347,9 @@ function displayRelated(images) {
             height="${img.height || 800}"
 
             style="
-              aspect-ratio:${img.width || 600}/${img.height || 800};
-              background:#f2f2f2;
+              width:100%;
+              height:auto;
+              display:block;
             "
           >
 
