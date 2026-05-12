@@ -231,7 +231,6 @@
   </div>
 
 </section>
-
 <div class="page-wrapper">
 
   <main>
@@ -250,7 +249,7 @@
 
         <div class="photo-left">
 
-          <!-- IMAGE CARD -->
+          <!-- IMAGE -->
           <div class="image-section">
 
             <div class="photo-image-wrap">
@@ -299,22 +298,6 @@
 
           </div>
 
-          <!-- IMAGE INFO UNDER IMAGE -->
-          <div class="under-image-content">
-
-            <h1 class="under-image-title">
-              <%= title %>
-            </h1>
-
-            <p
-              id="seo-description"
-              class="under-image-desc"
-            >
-              <%= desc %>
-            </p>
-
-          </div>
-
           <!-- TAGS -->
           <div class="top-tags-row">
 
@@ -330,8 +313,8 @@
             <% }) %>
 
           </div>
+        </div> <!-- CLOSE .photo-left -->
 
-        </div>
 
         <!-- ================================= -->
         <!-- RIGHT SIDEBAR -->
@@ -340,6 +323,17 @@
         <aside class="photo-sidebar">
 
           <div class="details-sticky">
+
+            <h1>
+              <%= title %>
+            </h1>
+
+            <p
+              id="seo-description"
+              class="seo-desc"
+            >
+              <%= desc %>
+            </p>
 
             <!-- DOWNLOAD -->
             <a
