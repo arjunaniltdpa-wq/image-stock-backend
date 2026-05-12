@@ -56,7 +56,9 @@
   <link
     rel="preload"
     as="image"
-    href="<%= previewFileName ? previewUrl : originalUrl %>">
+    href="<%= previewUrl %>">
+
+  <link rel="image_src" href="<%= previewUrl %>">
     
   <!-- Performance -->
   <link rel="preconnect" href="https://cdn.pixeora.com" crossorigin>
@@ -79,7 +81,7 @@
     "name":"<%= title %>",
     "description":"<%= desc %>",
     "contentUrl":"<%= previewFileName ? previewUrl : originalUrl %>",
-    "thumbnailUrl":"<%= previewFileName ? previewUrl : originalUrl %>",
+    "thumbnailUrl":"<%= thumbUrl %>",
     "url":"https://pixeora.com/photo/<%= raw %>",
     "width":"<%= width %>",
     "height":"<%= height %>"
@@ -148,11 +150,13 @@
   <!-- SEARCH HERO -->
   <div class="search-hero">
 
-    <form
-      id="searchForm"
-      class="premium-search-form"
-      onsubmit="return redirectSearch()"
-    >
+    <form class="premium-search-form" onsubmit="return redirectSearch()">
+
+      <form
+        id="searchForm"
+        class="premium-search-form"
+        onsubmit="return redirectSearch()"
+      >
 
       <!-- SEARCH ICON -->
       <div class="premium-search-icon">
@@ -512,6 +516,8 @@
   </div>
 
 </section>
+
+</div>
 
 <!-- SHARE MODAL -->
 <div class="share-modal" id="shareModal">
