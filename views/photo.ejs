@@ -102,14 +102,17 @@
 
 <body class="premium-image-page">
 
+<!-- PREMIUM SEARCH HEADER -->
 <header class="premium-search-header" id="premiumHeader">
 
   <div class="search-header-inner">
 
+    <!-- LOGO -->
     <a href="/" class="search-logo">
       Pixeora
     </a>
 
+    <!-- CENTER NAV -->
     <nav class="search-nav">
       <a href="/">Home</a>
       <a href="/explore.html">Explore</a>
@@ -118,6 +121,7 @@
       <a href="/blog.html">Blog</a>
     </nav>
 
+    <!-- RIGHT -->
     <div class="search-actions">
 
       <a href="/upload.html" class="upload-btn-link">
@@ -136,18 +140,22 @@
 
   </div>
 
-  <!-- SEARCH -->
-  <div class="search-hero image-search-hero">
+  <!-- SEARCH HERO -->
+  <div class="search-hero">
 
-    <form class="premium-search-form" id="searchForm">
+    <form class="premium-search-form" onsubmit="return redirectSearch()">
 
+      <!-- SEARCH ICON -->
       <div class="premium-search-icon">
+
         <svg viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="7"></circle>
           <line x1="20" y1="20" x2="16.5" y2="16.5"></line>
         </svg>
+
       </div>
 
+      <!-- INPUT -->
       <input
         type="text"
         id="searchInput"
@@ -155,11 +163,14 @@
         required
       >
 
+      <!-- CATEGORY -->
       <select class="premium-select">
         <option>Wallpapers</option>
         <option>Photos</option>
+        <option>Backgrounds</option>
       </select>
 
+      <!-- BUTTON -->
       <button type="submit" class="premium-search-btn">
         Search
       </button>
@@ -973,7 +984,15 @@ function startRelatedSystem(keywords = [], imageData = {}) {
     <div class="masonry-col"></div>
     <div class="masonry-col"></div>
   `;
+  for(let i=0;i<8;i++){
 
+    const col =
+    grid.children[i % 4];
+
+    col.innerHTML += `
+      <div class="related-skeleton"></div>
+    `;
+  }
   /* Fallback if no keywords */
   if (!keywords.length && !imageData?.title) {
     loadRelatedFallback();
@@ -1002,14 +1021,17 @@ function startRelatedSystem(keywords = [], imageData = {}) {
   const filteredWords = words.filter(w => !stopWords.includes(w));
 
   // Pick top 3 strongest words
-  const primaryWords = filteredWords.slice(0, 3);
+  const primaryWords =
+  filteredWords
+  .filter(w => w.length > 4)
+  .slice(0, 5);
 
   /* ---------------------------------- */
   /* 🔥 PRIORITY ORDER (VERY IMPORTANT) */
   /* ---------------------------------- */
 
   const mainQuery =
-    primaryWords.slice(0, 2).join(" ");
+  primaryWords.slice(0, 2).join(" ");
   const subject = keywords[0] || "";
 
   relatedKeywordList = [
@@ -1035,12 +1057,36 @@ function startRelatedSystem(keywords = [], imageData = {}) {
 
 /* LOAD FIRST KEYWORD */
 async function loadNextKeywordBatch() {
-  if (relatedKeywordIndex >= relatedKeywordList.length) return;
-  const keyword = relatedKeywordList[relatedKeywordIndex++];
-  relatedPage = 1;
-  await loadMoreRelated(keyword);
-}
 
+  if (
+    relatedKeywordIndex >=
+    relatedKeywordList.length
+  ) {
+
+    // 🔥 FALLBACK AUTOMATICALLY
+    await loadRelatedFallback();
+    return;
+  }
+
+  const keyword =
+    relatedKeywordList[
+      relatedKeywordIndex++
+    ];
+
+  relatedCursor = null;
+  relatedPage = 1;
+
+  const loaded =
+    await loadMoreRelated(keyword);
+
+  // 🔥 If failed → next keyword
+  if (!loaded) {
+
+    loadNextKeywordBatch();
+
+  }
+
+}
 /* LOAD MORE */
 async function loadMoreRelated(keyword) {
   if (relatedLoading) return true;
@@ -1049,9 +1095,19 @@ async function loadMoreRelated(keyword) {
   try {
   const strongQuery = keyword;
 
+  const limit =
+  relatedImageCounter < 12
+  ? 12
+  : 20;
+
   const url = relatedCursor
-    ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=24`
-    : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=24`;
+  ? `${API_BASE}/api/search/next?q=${encodeURIComponent(strongQuery)}&cursor=${relatedCursor}&limit=${limit}`
+  : `${API_BASE}/api/search/first?q=${encodeURIComponent(strongQuery)}&limit=${limit}`;
+
+    if (!keyword || keyword.length < 2) {
+      relatedLoading = false;
+      return false;
+    }
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Search API failed");
@@ -1089,6 +1145,7 @@ function displayRelated(images) {
 
   if (!images || !images.length) return;
 
+
   const masonry =
     document.getElementById("related-images");
 
@@ -1097,10 +1154,18 @@ function displayRelated(images) {
     return;
   }
 
+  document
+  .querySelectorAll(".related-skeleton")
+  .forEach(el => el.remove());
+
   const cols =
     masonry.querySelectorAll(".masonry-col");
 
   images.forEach((img, index) => {
+
+    if (relatedImageCounter >= 80) return;
+
+    relatedImageCounter++;
 
     if (
       !img ||
@@ -1117,13 +1182,29 @@ function displayRelated(images) {
         : `${slugify(img.title || "image")}-${img._id}`;
 
     // 🔥 thumbnail priority
-    const imageFile =
-      img.thumbnailFileName ||
-      img.previewFileName ||
-      img.fileName;
+    /* STRICT FAST THUMBNAILS */
 
-    const imageUrl =
-      `https://cdn.pixeora.com/${encodeURIComponent(imageFile)}`;
+    let imageUrl = "";
+
+    if (img.thumbnailFileName) {
+
+      imageUrl =
+      `https://cdn.pixeora.com/${encodeURIComponent(
+        img.thumbnailFileName
+      )}`;
+
+    } else {
+
+      /* fallback ONLY if thumbnail missing */
+
+      imageUrl =
+      `https://cdn.pixeora.com/${encodeURIComponent(
+        img.fileName
+      )}`;
+    }
+
+    const fastLoad =
+    relatedImageCounter <= 8;
 
     const card =
       document.createElement("div");
@@ -1136,13 +1217,22 @@ function displayRelated(images) {
 
         <a href="/photo/${finalSlug}">
 
-            <img
+          <img
             src="${imageUrl}"
             alt="${img.title || ""}"
-            loading="lazy"
+
+            loading="${fastLoad ? "eager" : "lazy"}"
+            fetchpriority="${fastLoad ? "high" : "low"}"
             decoding="async"
-            fetchpriority="low"
-            >
+
+            width="${img.width || 600}"
+            height="${img.height || 800}"
+
+            style="
+              aspect-ratio:${img.width || 600}/${img.height || 800};
+              background:#f2f2f2;
+            "
+          >
 
         </a>
 
@@ -1163,8 +1253,12 @@ function displayRelated(images) {
     `;
 
     // 🔥 distribute columns
-    cols[index % cols.length].appendChild(card);
+    requestAnimationFrame(() => {
 
+      cols[index % cols.length]
+      .appendChild(card);
+
+    });
   });
 
 }
@@ -1186,16 +1280,43 @@ async function loadRelatedFallback() {
 /* ---------------------------------- */
 /* INFINITE SCROLL */
 /* ---------------------------------- */
+let relatedScrollLock = false;
+
 window.addEventListener("scroll", async () => {
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 400) {
-    const keyword = relatedKeywordList[relatedKeywordIndex - 1];
-    if (!keyword) return;
 
-    const loaded = await loadMoreRelated(keyword);
-    if (!loaded) loadNextKeywordBatch();
+  if (relatedScrollLock) return;
+
+  if (
+    window.innerHeight + window.scrollY
+    >= document.body.offsetHeight - 1200
+  ) {
+
+    relatedScrollLock = true;
+
+    const keyword =
+    relatedKeywordList[
+      relatedKeywordIndex - 1
+    ];
+
+    if (!keyword) {
+      relatedScrollLock = false;
+      return;
+    }
+
+    const loaded =
+    await loadMoreRelated(keyword);
+
+    if (!loaded) {
+      await loadNextKeywordBatch();
+    }
+
+    setTimeout(() => {
+      relatedScrollLock = false;
+    }, 700);
+
   }
-});
 
+});
 
 /* ---------------------------------- */
 /* LAZY LOADING */

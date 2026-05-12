@@ -29,6 +29,10 @@ router.get(
 
       }
 
+      const sort =
+      (req.query.sort || "relevant")
+      .toLowerCase();
+
       const page =
       Math.max(
         parseInt(req.query.page) || 1,
@@ -57,17 +61,30 @@ router.get(
 
       )
 
-      .sort({
+      .sort(
 
-        score: {
-          $meta: "textScore"
-        },
+        sort === "popular"
 
-        downloads: -1,
+        ? {
+            downloads: -1,
+            createdAt: -1
+          }
 
-        createdAt: -1
+        : sort === "new"
 
-      })
+        ? {
+            createdAt: -1
+          }
+
+        : {
+            score: {
+              $meta: "textScore"
+            },
+            downloads: -1,
+            createdAt: -1
+          }
+
+      )
 
       .skip(skip)
 
