@@ -63,8 +63,6 @@ router.get(
 
         downloads: -1,
 
-        _id: -1
-
       })
 
       .select(`
@@ -191,14 +189,6 @@ router.get(
 
       };
 
-      if (cursor) {
-
-        query._id = {
-          $lt: cursor
-        };
-
-      }
-
       const images =
       await Image.find(
 
@@ -219,8 +209,6 @@ router.get(
         },
 
         downloads: -1,
-
-        _id: -1
 
       })
 
