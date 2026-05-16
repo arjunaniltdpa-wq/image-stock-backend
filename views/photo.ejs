@@ -66,17 +66,37 @@
     "logo": "https://pixeora.com/images/logo.png"
   }
   </script>
+
   <script type="application/ld+json">
   {
-    "@context":"https://schema.org",
-    "@type":"ImageObject",
-    "name":"<%= title %>",
-    "description":"<%= desc %>",
-    "contentUrl":"<%= previewUrl %>",
-    "thumbnailUrl":"<%= thumbUrl %>",
-    "url":"https://pixeora.com/photo/<%= raw %>",
-    "width":"<%= width %>",
-    "height":"<%= height %>"
+    "@context": "https://schema.org",
+    "@type": "ImageObject",
+
+    "name": "<%= title %>",
+    "description": "<%= desc %>",
+
+    "contentUrl": "<%= previewUrl %>",
+    "thumbnailUrl": "<%= thumbUrl %>",
+
+    "url": "https://pixeora.com/photo/<%= raw %>",
+
+    "width": "<%= width %>",
+    "height": "<%= height %>",
+
+    "encodingFormat": "image/webp",
+
+    "creator": {
+      "@type": "Organization",
+      "name": "Pixeora"
+    },
+
+    "creditText": "Pixeora",
+
+    "copyrightNotice": "© Pixeora",
+
+    "license": "https://pixeora.com/license",
+
+    "acquireLicensePage": "https://pixeora.com/license"
   }
   </script>
   <link rel="canonical" href="https://pixeora.com/photo/<%= raw %>">
@@ -303,39 +323,46 @@
               class="under-image-desc"
             >
 
-              <p>
+              <!-- SHORT INTRO -->
+              <p class="main-image-description">
                 <%= desc %>
               </p>
 
+              <!-- SEO CONTENT -->
               <div class="seo-content-block">
 
                 <h2>
-                  About This <%= categoryLabel %>
+                  About This Wallpaper
                 </h2>
 
-                <p>
-                  <%= seoParagraph1 %>
-                </p>
+                <% if (seoParagraph1 && seoParagraph1 !== desc) { %>
+                  <p>
+                    <%= seoParagraph1 %>
+                  </p>
+                <% } %>
 
-                <p>
-                  <%= seoParagraph2 %>
-                </p>
-                
+                <% if (
+                  seoParagraph2 &&
+                  seoParagraph2 !== desc &&
+                  seoParagraph2 !== seoParagraph1
+                ) { %>
+                  <p>
+                    <%= seoParagraph2 %>
+                  </p>
+                <% } %>
+
                 <div class="seo-links">
 
                   <a href="/search.html?query=<%= encodeURIComponent(keywords[0]) %>">
-
                     Explore <%= keywords[0] %> wallpapers
-
                   </a>
 
                   <a href="/search.html?query=<%= encodeURIComponent(keywords[1]) %>">
-
                     More <%= keywords[1] %> backgrounds
-
                   </a>
 
                 </div>
+
               </div>
 
             </div>
@@ -439,7 +466,29 @@
                 </span>
 
                 <strong>
-                  4K Ultra HD
+
+                  <% if (width >= 3840 || height >= 2160) { %>
+
+                    4K Ultra HD
+
+                  <% } else if (width >= 2560 || height >= 1440) { %>
+
+                    2K QHD
+
+                  <% } else if (width >= 1920 || height >= 1080) { %>
+
+                    Full HD
+
+                  <% } else if (width >= 1280 || height >= 720) { %>
+
+                    HD
+
+                  <% } else { %>
+
+                    Standard Resolution
+
+                  <% } %>
+
                 </strong>
 
               </div>
