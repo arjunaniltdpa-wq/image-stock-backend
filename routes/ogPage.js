@@ -82,12 +82,25 @@ router.get("/:slug", async (req, res) => {
       previewUrl,
       originalUrl,
       thumbUrl,
+
       keywords: image.keywords || [],
       related,
+
       ogPinterest,
       ogDefault,
+
       pinterestWidth,
-      pinterestHeight
+      pinterestHeight,
+
+      categoryLabel: image.category || "Wallpaper",
+
+      seoParagraph1:
+        image.seoParagraph1 ||
+        desc,
+
+      seoParagraph2:
+        image.seoParagraph2 ||
+        desc
     });
 
   } catch (err) {
