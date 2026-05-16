@@ -3,7 +3,7 @@ import sharp from "sharp";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import Image from "./models/Image.js";
+import Image from "../lib/models/Image.js";
 
 dotenv.config();
 

@@ -1,5 +1,5 @@
 import express from "express";
-import Image from "../models/Image.js";
+import Image from "../lib/models/Image.js";
 import dotenv from "dotenv";
 
 dotenv.config();

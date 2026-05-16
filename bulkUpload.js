@@ -8,7 +8,7 @@ import sharp from "sharp";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
-import Image from "./models/Image.js";
+import Image from "../lib/models/Image.js";
 
 dotenv.config();
 

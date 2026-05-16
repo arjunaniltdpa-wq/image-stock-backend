@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from "express";
 import multer from "multer";
-import Image from "../models/Image.js";
+import Image from "../lib/models/Image.js";
 import { generateSEOFromFilename } from "../lib/seoGenerator.js";
 import mime from "mime";
 import sharp from "sharp";

@@ -1,7 +1,7 @@
 // fix-slugs.js
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Image from "./models/Image.js";
+import Image from "./lib/models/Image.js";
 
 dotenv.config();
 

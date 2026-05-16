@@ -1,7 +1,7 @@
 // migrateSEO.js
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Image from "./models/Image.js"; // your existing Image model
+import Image from "./lib/models/Image.js";
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
 
 dotenv.config();

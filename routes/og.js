@@ -1,6 +1,6 @@
 import express from "express";
 import sharp from "sharp";
-import Image from "../models/Image.js";
+import Image from "../lib/models/Image.js";
 import fetch from "node-fetch";
 
 const router = express.Router();
