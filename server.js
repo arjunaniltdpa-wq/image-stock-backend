@@ -7,7 +7,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import imageRoutes from "./routes/imageRoutes.js";
-import Image from "./models/Image.js";
+import Image from "./lib/models/Image.js";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 import { fileURLToPath } from "url";
