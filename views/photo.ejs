@@ -14,18 +14,17 @@
   <meta name="theme-color" content="#ffffff">
 
   <!-- OG TAGS SERVED BY BACKEND -->
+  <meta name="twitter:image" content="<%= previewUrl %>">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://pixeora.com/photo/<%= raw %>">
   <meta property="og:title" content="<%= title %>">
   <meta property="og:description" content="<%= desc %>">
 
-  <meta property="og:image" content="<%= ogPinterest %>">
-  <meta property="og:image:width" content="<%= pinterestWidth %>">
-  <meta property="og:image:height" content="<%= pinterestHeight %>">
-
-  <meta property="og:image" content="<%= ogDefault %>">
+  <meta property="og:image" content="<%= previewUrl %>">
   <meta property="og:image:width" content="<%= width %>">
   <meta property="og:image:height" content="<%= height %>">
+  
+  <meta property="og:image:type" content="image/webp">
 
   <meta name="twitter:card" content="summary_large_image">   
   <!-- DO NOT define og:image here -->
@@ -144,12 +143,6 @@
   <div class="search-hero">
 
     <form class="premium-search-form" onsubmit="return redirectSearch()">
-
-      <form
-        id="searchForm"
-        class="premium-search-form"
-        onsubmit="return redirectSearch()"
-      >
 
       <!-- SEARCH ICON -->
       <div class="premium-search-icon">
@@ -287,8 +280,7 @@
                 </button>
 
                 <button
-                  class="floating-icon-btn"
-                  id="openShareModal"
+                  class="floating-icon-btn openShareModal"
                 >
                   ↗
                 </button>
@@ -306,12 +298,47 @@
               <%= title %>
             </h1>
 
-            <p
+            <div
               id="seo-description"
               class="under-image-desc"
             >
-              <%= desc %>
-            </p>
+
+              <p>
+                <%= desc %>
+              </p>
+
+              <div class="seo-content-block">
+
+                <h2>
+                  About This <%= categoryLabel %>
+                </h2>
+
+                <p>
+                  <%= seoParagraph1 %>
+                </p>
+
+                <p>
+                  <%= seoParagraph2 %>
+                </p>
+                
+                <div class="seo-links">
+
+                  <a href="/search.html?query=<%= encodeURIComponent(keywords[0]) %>">
+
+                    Explore <%= keywords[0] %> wallpapers
+
+                  </a>
+
+                  <a href="/search.html?query=<%= encodeURIComponent(keywords[1]) %>">
+
+                    More <%= keywords[1] %> backgrounds
+
+                  </a>
+
+                </div>
+              </div>
+
+            </div>
 
           </div>
 
@@ -359,8 +386,7 @@
               </button>
 
               <button
-                class="share-btn"
-                id="openShareModal"
+                class="share-btn openShareModal"
               >
                 Share
               </button>
@@ -619,6 +645,43 @@
 
 </div>
 
+<!-- INFO MODAL -->
+<div id="infoModal" class="info-modal">
+
+  <div class="info-box">
+
+    <button class="close-btn">×</button>
+
+    <h3>Image Information</h3>
+
+    <div class="info-grid">
+
+      <div class="info-item">
+        <span>Name</span>
+        <strong id="info-name"></strong>
+      </div>
+
+      <div class="info-item">
+        <span>Dimensions</span>
+        <strong id="info-dimensions"></strong>
+      </div>
+
+      <div class="info-item">
+        <span>Format</span>
+        <strong id="info-format"></strong>
+      </div>
+
+      <div class="info-item">
+        <span>File Size</span>
+        <strong id="info-size"></strong>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
 </body>
 
 <script>
@@ -749,19 +812,12 @@ async function loadImageDetails() {
       : (file ? `https://cdn.pixeora.com/thumbs/${file}` : "");
 
     const previewUrl = img.previewFileName
-    ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
-    : img.fileName
-        ? `https://cdn.pixeora.com/${encodeURIComponent(img.fileName)}`
-        : "";
+      ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
+      : "";
 
     const originalUrl = file
       ? `https://cdn.pixeora.com/${file}`
       : (img.url || "");    
-
-    const linkImg = document.createElement("link");
-    linkImg.rel = "image_src";
-    linkImg.href = previewUrl || originalUrl;
-    document.head.appendChild(linkImg);
 
     const mainImg = document.getElementById("download-image");
 
@@ -782,8 +838,14 @@ async function loadImageDetails() {
 
     // --- 2️⃣ Upgrade ONLY to preview.webp ---
     // --- 2️⃣ Decide FINAL image (preview > original) ---
-    const finalMainSrc = previewUrl || originalUrl;
+    const finalMainSrc =
 
+      previewUrl?.includes(".webp")
+
+      ? previewUrl
+
+      : thumbUrl;
+      
     if (finalMainSrc) {
       const finalImg = new Image();
       finalImg.src = finalMainSrc;  
@@ -849,7 +911,9 @@ async function loadImageDetails() {
       "name": safeTitle,
       "description": img.description || safeTitle,
 
-      "contentUrl": originalUrl || previewUrl,
+      "contentUrl": previewUrl || thumbUrl,
+      "width": img.width,
+      "height": img.height,
       "thumbnailUrl": thumbUrl,
 
       "url": window.location.href,
@@ -904,21 +968,6 @@ async function loadImageDetails() {
     const ldEl = document.getElementById("ld-json");
     if (ldEl) ldEl.textContent = JSON.stringify(ld);
 
-    // 👉 Load ORIGINAL image only for dimension accuracy
-    if (originalUrl) {
-      const dimImg = new Image();
-      dimImg.src = originalUrl;
-
-      dimImg.onload = () => {
-        if (dimImg.naturalWidth && dimImg.naturalHeight) {
-          ld.width = dimImg.naturalWidth;
-          ld.height = dimImg.naturalHeight;
-
-          if (ldEl) ldEl.textContent = JSON.stringify(ld);
-        }
-      };
-    }
-
     // Keywords
     const keywords =
       (img.keywords?.length ? img.keywords :
@@ -939,7 +988,6 @@ async function loadImageDetails() {
 }
 
 const shareModal = document.getElementById("shareModal");
-const openShareModal = document.getElementById("openShareModal");
 const closeShareModal = document.getElementById("closeShareModal");
 
 const currentUrl = window.location.href;
@@ -961,9 +1009,15 @@ document.getElementById("whatsappShare").href =
 document.getElementById("telegramShare").href =
 `https://t.me/share/url?url=${encodeURIComponent(currentUrl)}`;
 
-openShareModal.onclick = () => {
-  shareModal.classList.add("active");
-};
+document
+  .querySelectorAll(".openShareModal")
+  .forEach(btn => {
+
+    btn.onclick = () => {
+      shareModal.classList.add("active");
+    };
+
+  });
 
 closeShareModal.onclick = () => {
   shareModal.classList.remove("active");
