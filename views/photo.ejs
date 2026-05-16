@@ -844,6 +844,10 @@ async function loadImageDetails() {
 
       ? previewUrl
 
+      : originalUrl
+
+      ? originalUrl
+
       : thumbUrl;
       
     if (finalMainSrc) {
@@ -1563,13 +1567,9 @@ function displayRelated(
 
     ? `https://cdn.pixeora.com/${encodeURIComponent(img.thumbnailFileName)}`
 
-    : img.previewFileName
+    : img.previewFileName?.includes(".webp")
 
     ? `https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName)}`
-
-    : img.fileName
-
-    ? `https://cdn.pixeora.com/${encodeURIComponent(img.fileName)}`
 
     : "";
 
@@ -1595,7 +1595,7 @@ function displayRelated(
           class="related-image"
           onerror="
             this.onerror=null;
-            this.src='https://cdn.pixeora.com/${encodeURIComponent(img.previewFileName || img.fileName || '')}';
+            this.src='https://cdn.pixeora.com/${encodeURIComponent(img.thumbnailFileName || img.previewFileName || '')}';
           "
         />
 
