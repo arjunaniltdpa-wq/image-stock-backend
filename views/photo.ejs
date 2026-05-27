@@ -900,6 +900,18 @@ async function loadImageDetails() {
 
       finalImg.onload = () => {
         mainImg.src = finalMainSrc;
+        window.__originalWidth = finalImg.naturalWidth;
+        window.__originalHeight = finalImg.naturalHeight;
+
+        const resolutionBox =
+        document.getElementById("real-resolution");
+
+        if (resolutionBox) {
+
+          resolutionBox.textContent =
+          `${finalImg.naturalWidth} × ${finalImg.naturalHeight}`;
+
+        }
         mainImg.style.transition = "filter .4s ease, opacity .3s ease";
         mainImg.style.filter = "blur(0)"; 
         mainImg.style.opacity = "1";
@@ -953,23 +965,22 @@ async function loadImageDetails() {
     const realWidth =
 
     img.width ||
-
+    img.imageWidth ||
+    img.meta?.width ||
     img.dimensions?.width ||
-
     img.metadata?.width ||
-
+    mainImg.naturalWidth ||
     0;
 
     const realHeight =
 
     img.height ||
-
+    img.imageHeight ||
+    img.meta?.height ||
     img.dimensions?.height ||
-
     img.metadata?.height ||
-
+    mainImg.naturalHeight ||
     0;
-
     window.__originalWidth = realWidth;
     window.__originalHeight = realHeight;
 
