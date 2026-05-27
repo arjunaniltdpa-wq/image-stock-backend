@@ -429,8 +429,8 @@
                   Resolution
                 </span>
 
-                <strong>
-                  <%= width %> × <%= height %>
+                <strong id="real-resolution">
+                  Loading...
                 </strong>
 
               </div>
@@ -561,13 +561,6 @@
     <h2>
       More Like This
     </h2>
-
-    <a
-      href="/explore.html"
-      class="view-all-link"
-    >
-      View all
-    </a>
 
   </div>
 
@@ -955,6 +948,18 @@ async function loadImageDetails() {
     }
     window.__originalFileName = img.fileName || img.file || "";
     window.__imageFileSize = img.size || null;
+    window.__originalWidth = img.width || 0;
+    window.__originalHeight = img.height || 0;
+
+    const resolutionBox =
+    document.getElementById("real-resolution");
+
+    if (resolutionBox) {
+
+      resolutionBox.textContent =
+      `${img.width} × ${img.height}`;
+
+    }
 
     // Create schema FIRST
     const ld = {
@@ -1755,7 +1760,7 @@ if (infoBtn && infoModal) {
     if (mainImg) {
 
       document.getElementById("info-dimensions").textContent =
-        `${mainImg.naturalWidth || 0} × ${mainImg.naturalHeight || 0}px`;
+      `${window.__originalWidth} × ${window.__originalHeight}px`;
 
       const src = mainImg.src || "";
 
@@ -1763,7 +1768,7 @@ if (infoBtn && infoModal) {
         src.split(".").pop().split("?")[0].toUpperCase();
 
       document.getElementById("info-format").textContent =
-        ext || "-";
+        "JPG";
 
     }
 
