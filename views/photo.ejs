@@ -600,27 +600,27 @@
     <div class="share-grid">
 
       <a id="pinterestShare" target="_blank" class="share-item pinterest">
-        <img src="/icons/pinterest.svg">
+        <img src="/icons/pinterest.png">
         <span>Pinterest</span>
       </a>
 
       <a id="facebookShare" target="_blank" class="share-item facebook">
-        <img src="/icons/facebook.svg">
+        <img src="/icons/facebook.png">
         <span>Facebook</span>
       </a>
 
       <a id="twitterShare" target="_blank" class="share-item twitter">
-        <img src="/icons/twitter.svg">
+        <img src="/icons/twitter.png">
         <span>X</span>
       </a>
 
       <a id="whatsappShare" target="_blank" class="share-item whatsapp">
-        <img src="/icons/whatsapp.svg">
+        <img src="/icons/whatsapp.png">
         <span>WhatsApp</span>
       </a>
 
       <a id="telegramShare" target="_blank" class="share-item telegram">
-        <img src="/icons/telegram.svg">
+        <img src="/icons/telegram.png">
         <span>Telegram</span>
       </a>
 
@@ -837,6 +837,8 @@ async function loadImageDetails() {
       const j = await res.json();
       img = j.image || j.data || j.result || j;
 
+      console.log("FULL IMAGE DATA:", img);
+
       if (Array.isArray(img)) img = img[0];
       if (!img || typeof img !== "object") {
         throw new Error("Invalid image data");
@@ -948,8 +950,28 @@ async function loadImageDetails() {
     }
     window.__originalFileName = img.fileName || img.file || "";
     window.__imageFileSize = img.size || null;
-    window.__originalWidth = img.width || 0;
-    window.__originalHeight = img.height || 0;
+    const realWidth =
+
+    img.width ||
+
+    img.dimensions?.width ||
+
+    img.metadata?.width ||
+
+    0;
+
+    const realHeight =
+
+    img.height ||
+
+    img.dimensions?.height ||
+
+    img.metadata?.height ||
+
+    0;
+
+    window.__originalWidth = realWidth;
+    window.__originalHeight = realHeight;
 
     const resolutionBox =
     document.getElementById("real-resolution");
@@ -957,7 +979,7 @@ async function loadImageDetails() {
     if (resolutionBox) {
 
       resolutionBox.textContent =
-      `${img.width} × ${img.height}`;
+      `${realWidth} × ${realHeight}`;
 
     }
 
