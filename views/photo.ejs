@@ -344,7 +344,7 @@
 
                     <tr>
                       <td>Category</td>
-                      <td><%= category || "General" %></td>
+                      <td><%= typeof category !== 'undefined' ? category : 'Stock Images' %></td>
                     </tr>
 
                     <tr>
