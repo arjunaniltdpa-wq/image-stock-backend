@@ -297,6 +297,21 @@
 
           <!-- IMAGE INFO UNDER IMAGE -->
           <div class="under-image-content">
+            <nav class="breadcrumbs">
+
+              <a href="/">Home</a>
+
+              <span>›</span>
+
+              <a href="/<%= category %>.html">
+                <%= category %>
+              </a>
+
+              <span>›</span>
+
+              <span><%= title %></span>
+
+            </nav>
 
             <h1 class="under-image-title">
               <%= title %>
@@ -311,7 +326,7 @@
               <div class="seo-content-block">
 
                 <h2>
-                  About This Wallpaper
+                  About This Image
                 </h2>
                 
                 <!-- SHORT INTRO -->
@@ -334,6 +349,47 @@
                     <%= seoParagraph2 %>
                   </p>
                 <% } %>
+
+
+                <div class="image-specs">
+
+                  <h3>Image Specifications</h3>
+
+                  <table class="image-spec-table">
+
+                    <tr>
+                      <td>Category</td>
+                      <td><%= category || "General" %></td>
+                    </tr>
+
+                    <tr>
+                      <td>Resolution</td>
+                      <td><%= width %> × <%= height %></td>
+                    </tr>
+
+                    <tr>
+                      <td>Orientation</td>
+                      <td>
+                        <%= width > height ? "Landscape" :
+                            height > width ? "Portrait" :
+                            "Square" %>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td>Format</td>
+                      <td>JPG</td>
+                    </tr>
+
+                    <tr>
+                      <td>License</td>
+                      <td>Free Personal & Commercial Use</td>
+                    </tr>
+
+                  </table>
+
+                </div>
+
 
                 <div class="seo-links">
 
@@ -1024,7 +1080,7 @@ async function loadImageDetails() {
           "@type": "ListItem",
           "position": 2,
           "name": "Stock Images",
-          "item": "https://pixeora.com"
+          "item": "https://pixeora.com/explore.html"
         },
         {
           "@type": "ListItem",
