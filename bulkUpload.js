@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
+import { generateAISEO } from "./lib/aiWriter.js";
 import Image from "./lib/models/Image.js";
 
 dotenv.config();
@@ -150,6 +151,37 @@ async function uploadAll() {
       const seo = generateSEOFromFilename(originalName);
       const meta = await sharp(filePath).metadata();
 
+      let ai;
+
+      try {
+          ai = await generateAISEO({
+              title: seo.title,
+              category: seo.category,
+              secondaryCategory: seo.secondaryCategory,
+              tags: seo.tags,
+              keywords: seo.keywords,
+              width: meta.width,
+              height: meta.height,
+              orientation:
+                  meta.width > meta.height
+                      ? "Landscape"
+                      : "Portrait",
+              format: ext.toUpperCase()
+          });
+      } catch (error) {
+          console.log("AI failed. Using SEO description.");
+
+        ai = {
+            description: seo.description,
+            metaDescription: seo.description.substring(0,155),
+            alt: seo.alt,
+            caption: seo.title,
+            useCases: []
+        };
+      }
+
+      console.log(ai);
+      
       /* ---------------- SAVE TO MONGODB ---------------- */
       const doc = await Image.create({
         title: seo.title,
@@ -165,10 +197,15 @@ async function uploadAll() {
 
         category: seo.category,
         secondaryCategory: seo.secondaryCategory,
-        description: seo.description,
-        alt: seo.alt,
+        description: ai.description,
+        metaDescription: ai.metaDescription,
+        alt: ai.alt,
         tags: seo.tags,
         keywords: seo.keywords,
+        width: meta.width,
+        height: meta.height,
+        caption: ai.caption,
+        useCases: ai.useCases,
 
         uploadedAt: new Date()
       });

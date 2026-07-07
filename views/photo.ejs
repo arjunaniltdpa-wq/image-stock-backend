@@ -315,26 +315,9 @@
                 </h2>
                 
                 <!-- SHORT INTRO -->
-                <p class="main-image-description">
-                  <%= desc %>
-                </p>
-
-                <% if (seoParagraph1 && seoParagraph1 !== desc) { %>
-                  <p>
-                    <%= seoParagraph1 %>
-                  </p>
-                <% } %>
-
-                <% if (
-                  seoParagraph2 &&
-                  seoParagraph2 !== desc &&
-                  seoParagraph2 !== seoParagraph1
-                ) { %>
-                  <p>
-                    <%= seoParagraph2 %>
-                  </p>
-                <% } %>
-
+                <div class="main-image-description">
+                    <%= desc %>
+                </div>
 
                 <div class="image-specs">
 
