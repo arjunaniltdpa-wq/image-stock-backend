@@ -346,7 +346,7 @@
 
                 </div>
 
-                <% } %
+                <% } %>
 
                 <% if(useCases && useCases.length){ %>
 
@@ -404,7 +404,7 @@
 
                     <tr>
                         <td>Format</td>
-                        <td>JPG</td>
+                        <td><%= image.format || "JPG" %></td>
                     </tr>
 
                     <tr>
@@ -450,7 +450,7 @@
 
                 </div>
 
-                <% } %
+                <% } %>
 
                 <div class="image-details">
 
@@ -478,9 +478,7 @@
                         <div class="detail-card">
                             <span class="label">Orientation</span>
                             <span class="value">
-                                <%= width > height ? "Landscape" :
-                                    height > width ? "Portrait" :
-                                    "Square" %>
+                                <%= image.orientation %>
                             </span>
                         </div>
 
@@ -517,9 +515,13 @@
                     Explore <%= keywords[0] %> wallpapers
                   </a>
 
+                  <% if(keywords.length > 1){ %>
+
                   <a href="/search.html?query=<%= encodeURIComponent(keywords[1]) %>">
-                    More <%= keywords[1] %> backgrounds
+                  More <%= keywords[1] %> backgrounds
                   </a>
+
+                  <% } %>
 
                 </div>
 
