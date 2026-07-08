@@ -234,29 +234,19 @@
 
   <main>
 
-    <!-- ========================= -->
-    <!-- MAIN LAYOUT -->
-    <!-- ========================= -->
-
     <section class="photo-hero">
 
       <div class="wallpaper-container">
 
-        <!-- ================================= -->
         <!-- LEFT COLUMN -->
-        <!-- ================================= -->
-
         <div class="photo-left">
 
-          <!-- IMAGE CARD -->
+          <!-- IMAGE -->
           <div class="image-section">
 
             <div class="photo-image-wrap">
 
-              <div
-                id="main-skeleton"
-                class="skeleton"
-              ></div>
+              <div id="main-skeleton" class="skeleton"></div>
 
               <img
                 id="download-image"
@@ -270,12 +260,9 @@
 
               <div id="image-protect-overlay"></div>
 
-              <!-- FLOATING ACTIONS -->
               <div class="floating-image-actions">
 
-                <button class="floating-icon-btn">
-                  ❤
-                </button>
+                <button class="floating-icon-btn">❤</button>
 
                 <button
                   class="floating-icon-btn"
@@ -285,8 +272,7 @@
                 </button>
 
                 <button
-                  class="floating-icon-btn openShareModal"
-                >
+                  class="floating-icon-btn openShareModal">
                   ↗
                 </button>
 
@@ -296,53 +282,40 @@
 
           </div>
 
-          <!-- IMAGE INFO UNDER IMAGE -->
+          <!-- CONTENT -->
           <div class="under-image-content">
 
             <h1 class="under-image-title">
               <%= title %>
             </h1>
 
-            <div
-              id="seo-description"
-              class="under-image-desc"
-            >
+            <div id="seo-description" class="under-image-desc">
 
-              <!-- SEO CONTENT -->
               <div class="seo-content-block">
 
-                <h2>
-                  About This Image
-                </h2>
-                
-                <!-- SHORT INTRO -->
+                <h2>About This Image</h2>
+
                 <div class="main-image-description">
-
-                <p><%= image.description %></p>
-
+                  <p><%= image.description %></p>
                 </div>
 
                 <div class="image-meta-intro">
-
-                <p>
-
-                This <strong><%= category %></strong> image has a resolution of
-                <strong><%= width %> × <%= height %></strong>
-                and is available for free download for personal and commercial projects.
-                It can be used in websites, blogs, presentations, digital marketing,
-                social media posts, wallpapers and creative design work.
-
-                </p>
-
+                  <p>
+                    This <strong><%= category %></strong> image has a resolution of
+                    <strong><%= width %> × <%= height %></strong>
+                    and is available for free download for personal and commercial projects.
+                    It can be used in websites, blogs, presentations, digital marketing,
+                    social media posts, wallpapers and creative design work.
+                  </p>
                 </div>
 
                 <% if(caption){ %>
 
                 <div class="image-caption">
 
-                <h3>Caption</h3>
+                  <h3>Caption</h3>
 
-                <p><%= caption %></p>
+                  <p><%= caption %></p>
 
                 </div>
 
@@ -352,46 +325,50 @@
 
                 <div class="use-case-section">
 
-                <h3>Recommended Uses</h3>
+                  <h3>Recommended Uses</h3>
 
-                <div class="use-case-grid">
+                  <div class="use-case-grid">
 
-                <% useCases.forEach(item=>{ %>
+                    <% useCases.forEach(item=>{ %>
 
-                <span class="use-chip">
-                <%= item %>
-                </span>
+                      <span class="use-chip"><%= item %></span>
 
-                <% }) %>
+                    <% }) %>
 
-                <div class="spec-note">
+                  </div>
 
-                <p>
+                  <div class="spec-note">
 
-                The image is available in its original resolution and can be downloaded
-                for websites, blog articles, social media graphics, presentations,
-                marketing materials, digital designs, wallpapers, print projects and
-                other creative work.
+                    <p>
 
-                </p>
+                      The image is available in its original resolution and can be downloaded
+                      for websites, blog articles, social media graphics, presentations,
+                      marketing materials, digital designs, wallpapers, print projects and
+                      other creative work.
+
+                    </p>
+
+                  </div>
+
+                  <div class="seo-links">
+
+                    <a href="/search.html?query=<%= encodeURIComponent(keywords[0]) %>">
+                      Explore <%= keywords[0] %> wallpapers
+                    </a>
+
+                    <% if(keywords.length > 1){ %>
+
+                    <a href="/search.html?query=<%= encodeURIComponent(keywords[1]) %>">
+                      More <%= keywords[1] %> backgrounds
+                    </a>
+
+                    <% } %>
+
+                  </div>
 
                 </div>
 
-                <div class="seo-links">
-
-                  <a href="/search.html?query=<%= encodeURIComponent(keywords[0]) %>">
-                    Explore <%= keywords[0] %> wallpapers
-                  </a>
-
-                  <% if(keywords.length > 1){ %>
-
-                  <a href="/search.html?query=<%= encodeURIComponent(keywords[1]) %>">
-                  More <%= keywords[1] %> backgrounds
-                  </a>
-
-                  <% } %>
-
-                </div>
+                <% } %>
 
               </div>
 
@@ -399,170 +376,146 @@
 
           </div>
 
-          <!-- TAGS -->
           <% if(keywords && keywords.length){ %>
 
           <div class="popular-tags">
 
-              <h2>Popular Tags</h2>
+            <h2>Popular Tags</h2>
 
-              <p>
-                  Browse related topics and discover more images with similar themes.
-              </p>
+            <p>
+              Browse related topics and discover more images with similar themes.
+            </p>
 
-              <div class="tag-grid">
+            <div class="tag-grid">
 
-                  <% keywords.slice(0,15).forEach(tag=>{ %>
+              <% keywords.slice(0,15).forEach(tag=>{ %>
 
-                      <a
-                          href="/search?q=<%= encodeURIComponent(tag) %>"
-                          class="tag-chip">
+              <a
+                href="/search?q=<%= encodeURIComponent(tag) %>"
+                class="tag-chip">
 
-                          <%= tag %>
+                <%= tag %>
 
-                      </a>
+              </a>
 
-                  <% }) %>
+              <% }) %>
 
-              </div>
+            </div>
 
           </div>
 
           <% } %>
 
-        <!-- ================================= -->
-        <!-- RIGHT SIDEBAR -->
-        <!-- ================================= -->
+        </div>
+        <!-- END photo-left -->
 
+
+        <!-- RIGHT SIDEBAR -->
         <aside class="photo-sidebar">
 
           <div class="details-sticky">
 
-            <!-- DOWNLOAD -->
             <a
               id="download-link"
               class="download-btn premium-download-btn"
               href="#"
-              download="<%= title %>.jpg"
-            >
+              download="<%= title %>.jpg">
+
               Free Download
+
             </a>
 
-            <!-- ACTIONS -->
             <div class="sidebar-actions">
 
-              <button class="info-btn">
-                Info
-              </button>
+              <button class="info-btn">Info</button>
 
-              <button
-                class="share-btn openShareModal"
-              >
+              <button class="share-btn openShareModal">
                 Share
               </button>
 
             </div>
 
-            <!-- META -->
-            <!-- IMAGE DETAILS -->
             <div class="sidebar-image-details">
 
-                <h3 class="sidebar-title">
-                    Image Details
-                </h3>
+              <h3 class="sidebar-title">Image Details</h3>
 
-                <table class="sidebar-details-table">
+              <table class="sidebar-details-table">
 
-                    <tr>
-                        <td>Category</td>
-                        <td><%= category %></td>
-                    </tr>
+                <tr>
+                  <td>Category</td>
+                  <td><%= category %></td>
+                </tr>
 
-                    <% if(secondaryCategory){ %>
-                    <tr>
-                        <td>Sub Category</td>
-                        <td><%= secondaryCategory %></td>
-                    </tr>
+                <% if(secondaryCategory){ %>
+
+                <tr>
+                  <td>Sub Category</td>
+                  <td><%= secondaryCategory %></td>
+                </tr>
+
+                <% } %>
+
+                <tr>
+                  <td>Resolution</td>
+                  <td><%= width %> × <%= height %> px</td>
+                </tr>
+
+                <tr>
+                  <td>Orientation</td>
+                  <td><%= image.orientation || (width > height ? "Landscape" : height > width ? "Portrait" : "Square") %></td>
+                </tr>
+
+                <tr>
+                  <td>Format</td>
+                  <td><%= image.format || "JPG" %></td>
+                </tr>
+
+                <tr>
+                  <td>Quality</td>
+                  <td>
+                    <% if(width >= 7680 || height >= 4320){ %>
+                      8K Ultra HD
+                    <% } else if(width >= 3840 || height >= 2160){ %>
+                      4K Ultra HD
+                    <% } else if(width >= 2560 || height >= 1440){ %>
+                      2K QHD
+                    <% } else if(width >= 1920 || height >= 1080){ %>
+                      Full HD
+                    <% } else { %>
+                      HD
                     <% } %>
+                  </td>
+                </tr>
 
-                    <tr>
-                        <td>Resolution</td>
-                        <td><%= width %> × <%= height %> px</td>
-                    </tr>
+                <tr>
+                  <td>File Size</td>
+                  <td>
+                    <%= image.size ? (image.size/1024/1024).toFixed(2)+" MB" : "-" %>
+                  </td>
+                </tr>
 
-                    <tr>
-                        <td>Orientation</td>
-                        <td><%= image.orientation || (width > height ? "Landscape" : height > width ? "Portrait" : "Square") %></td>
-                    </tr>
+                <tr>
+                  <td>License</td>
+                  <td>Free Commercial Use</td>
+                </tr>
 
-                    <tr>
-                        <td>Format</td>
-                        <td><%= image.format || "JPG" %></td>
-                    </tr>
-
-                    <tr>
-                        <td>Quality</td>
-                        <td>
-
-                            <% if(width >= 7680 || height >= 4320){ %>
-
-                                8K Ultra HD
-
-                            <% } else if(width >= 3840 || height >= 2160){ %>
-
-                                4K Ultra HD
-
-                            <% } else if(width >= 2560 || height >= 1440){ %>
-
-                                2K QHD
-
-                            <% } else if(width >= 1920 || height >= 1080){ %>
-
-                                Full HD
-
-                            <% } else { %>
-
-                                HD
-
-                            <% } %>
-
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>File Size</td>
-                        <td>
-
-                            <%= image.size
-                                ? (image.size / 1024 / 1024).toFixed(2) + " MB"
-                                : "-" %>
-
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>License</td>
-                        <td>Free Commercial Use</td>
-                    </tr>
-
-                </table>
+              </table>
 
             </div>
 
-            <!-- TAGS -->
             <div class="detail-group">
 
-              <div class="detail-label">
-                Tags
-              </div>
+              <div class="detail-label">Tags</div>
 
               <div class="detail-tags">
 
-                <% keywords.slice(0,12).forEach(k => { %>
+                <% keywords.slice(0,12).forEach(k=>{ %>
 
-                  <a href="/search.html?query=<%= encodeURIComponent(k) %>">
-                    <%= k %>
-                  </a>
+                <a href="/search.html?query=<%= encodeURIComponent(k) %>">
+
+                  <%= k %>
+
+                </a>
 
                 <% }) %>
 
@@ -570,22 +523,15 @@
 
             </div>
 
-            <!-- CREATOR -->
             <div class="creator-card">
 
-              <div class="creator-avatar">
-                P
-              </div>
+              <div class="creator-avatar">P</div>
 
               <div class="creator-info">
 
-                <strong>
-                  Pixeora Creator
-                </strong>
+                <strong>Pixeora Creator</strong>
 
-                <span>
-                  Premium Stock Images
-                </span>
+                <span>Premium Stock Images</span>
 
               </div>
 
@@ -596,6 +542,7 @@
         </aside>
 
       </div>
+      <!-- wallpaper-container -->
 
     </section>
 
