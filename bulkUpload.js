@@ -154,30 +154,44 @@ async function uploadAll() {
       let ai;
 
       try {
-          ai = await generateAISEO({
-              title: seo.title,
-              category: seo.category,
-              secondaryCategory: seo.secondaryCategory,
-              tags: seo.tags,
-              keywords: seo.keywords,
-              width: meta.width,
-              height: meta.height,
-              orientation:
-                  meta.width > meta.height
-                      ? "Landscape"
-                      : "Portrait",
-              format: ext.toUpperCase()
-          });
+          ai = await Promise.race([
+              generateAISEO({
+                  title: seo.title,
+                  category: seo.category,
+                  secondaryCategory: seo.secondaryCategory,
+                  tags: seo.tags,
+                  keywords: seo.keywords,
+                  width: meta.width,
+                  height: meta.height,
+                  orientation:
+                      meta.width > meta.height
+                          ? "Landscape"
+                          : meta.height > meta.width
+                              ? "Portrait"
+                              : "Square",
+                  format: ext.toUpperCase(),
+                  contentType:
+                      seo.category?.toLowerCase().includes("wallpaper")
+                          ? "wallpaper"
+                          : "stock"
+              }),
+
+              new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error("AI Timeout")), 20000)
+              )
+          ]);
+
       } catch (error) {
+
           console.log("AI failed. Using SEO description.");
 
-        ai = {
-            description: seo.description,
-            metaDescription: seo.description.substring(0,155),
-            alt: seo.alt,
-            caption: seo.title,
-            useCases: []
-        };
+          ai = {
+              description: seo.description,
+              metaDescription: seo.description.substring(0,155),
+              alt: seo.alt,
+              caption: seo.title,
+              useCases: []
+          };
       }
 
       console.log(ai);
@@ -185,7 +199,7 @@ async function uploadAll() {
       /* ---------------- SAVE TO MONGODB ---------------- */
       const doc = await Image.create({
         title: seo.title,
-        slug: seo.slug || uniqueBase, // safe fallback
+        slug: seo.slug || uniqueBase,
 
         fileName: originalKey,
         thumbnailFileName: thumbKey,
@@ -197,15 +211,27 @@ async function uploadAll() {
 
         category: seo.category,
         secondaryCategory: seo.secondaryCategory,
-        description: ai.description,
-        metaDescription: ai.metaDescription,
-        alt: ai.alt,
+
+        description: ai.description || seo.description,
+        metaDescription: ai.metaDescription || seo.description.substring(0,155),
+        alt: ai.alt || seo.alt,
+        caption: ai.caption || seo.title,
+        useCases: ai.useCases || [],
+
         tags: seo.tags,
         keywords: seo.keywords,
+
         width: meta.width,
         height: meta.height,
-        caption: ai.caption,
-        useCases: ai.useCases,
+        size: buffer.length,
+
+        orientation:
+            meta.width > meta.height
+                ? "Landscape"
+                : "Portrait",
+
+        format: ext.toUpperCase(),
+        mimeType: contentType,
 
         uploadedAt: new Date()
       });

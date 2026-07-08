@@ -64,21 +64,48 @@ router.get("/:slug", async (req, res) => {
       `Download ${title} in HD quality for free.`;
 
     // Related
-    const related = await Image.find({
-      _id: { $ne: image._id },
-      keywords: { $in: image.keywords || [] }
+    let related = await Image.find({
+        _id: { $ne: image._id },
+        category: image.category
     })
     .limit(20)
     .lean();
 
+    if (related.length < 20) {
+
+        const extra = await Image.find({
+
+            _id: {
+                $nin: [
+                    image._id,
+                    ...related.map(i => i._id)
+                ]
+            },
+
+            keywords: {
+                $in: image.keywords || []
+            }
+
+        })
+        .limit(20 - related.length)
+        .lean();
+
+        related.push(...extra);
+
+    }
     // FINAL RENDER
     res.render("photo", {
       image,
       raw,
       title,
       desc,
+
+      caption: image.caption || "",
+      useCases: image.useCases || [],
+
       width,
       height,
+
       previewUrl,
       originalUrl,
       thumbUrl,
@@ -92,15 +119,8 @@ router.get("/:slug", async (req, res) => {
       pinterestWidth,
       pinterestHeight,
 
-      categoryLabel: image.category || "Wallpaper",
-
-      seoParagraph1:
-        image.seoParagraph1 ||
-        desc,
-
-      seoParagraph2:
-        image.seoParagraph2 ||
-        desc
+      category: image.category || "Wallpaper",
+      secondaryCategory: image.secondaryCategory || ""
     });
 
   } catch (err) {

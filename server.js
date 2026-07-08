@@ -14,6 +14,7 @@ import { fileURLToPath } from "url";
 import mime from "mime";
 
 import { generateSEOFromFilename } from "./lib/seoGenerator.js";
+import { generateAISEO } from "./lib/aiWriter.js";
 
 sharp.concurrency(0);
 sharp.cache({
@@ -320,6 +321,21 @@ async function uploadLocalFolderToR2() {
 
       const meta = await sharp(filePath).metadata();
 
+      const ai = await generateAISEO({
+          title: seo.title,
+          category: seo.category,
+          secondaryCategory: seo.secondaryCategory,
+          tags: seo.tags,
+          keywords: seo.keywords,
+          width: meta.width,
+          height: meta.height,
+          orientation:
+              meta.width > meta.height
+                  ? "Landscape"
+                  : "Portrait",
+          format: ext.toUpperCase()
+      });
+
       const doc = await Image.create({
         title: seo.title,
         slug,
@@ -334,8 +350,11 @@ async function uploadLocalFolderToR2() {
         height: meta.height,
         tags: seo.tags,
         keywords: seo.keywords,
-        description: seo.description,
-        alt: seo.alt,
+        description: ai.description,
+        metaDescription: ai.metaDescription,
+        alt: ai.alt,
+        caption: ai.caption,
+        useCases: ai.useCases,
         uploadedAt: new Date(),
       });
 

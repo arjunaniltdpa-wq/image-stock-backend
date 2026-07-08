@@ -6,7 +6,8 @@
   <meta name="robots" content="index, follow">
 
   <title><%= title %></title>
-  <meta name="description" content="<%= desc %>">
+  <meta name="description"
+  content="<%= image.metaDescription || desc %>">
 
   <!-- Pinterest verification -->
   <meta name="pinterest-rich-pin" content="false">
@@ -264,7 +265,7 @@
                 fetchpriority="high"
                 width="<%= width %>"
                 height="<%= height %>"
-                alt="<%= title %>"
+                alt="<%= image.alt || title %>"
               />
 
               <div id="image-protect-overlay"></div>
@@ -316,8 +317,58 @@
                 
                 <!-- SHORT INTRO -->
                 <div class="main-image-description">
-                    <%= desc %>
+
+                <p><%= image.description %></p>
+
                 </div>
+
+                <div class="image-meta-intro">
+
+                <p>
+
+                This <strong><%= category %></strong> image has a resolution of
+                <strong><%= width %> × <%= height %></strong>
+                and is available for free download for personal and commercial projects.
+                It can be used in websites, blogs, presentations, digital marketing,
+                social media posts, wallpapers and creative design work.
+
+                </p>
+
+                </div>
+
+                <% if(caption){ %>
+
+                <div class="image-caption">
+
+                <h3>Caption</h3>
+
+                <p><%= caption %></p>
+
+                </div>
+
+                <% } %
+
+                <% if(useCases && useCases.length){ %>
+
+                <div class="use-case-section">
+
+                <h3>Recommended Uses</h3>
+
+                <div class="use-case-grid">
+
+                <% useCases.forEach(item=>{ %>
+
+                <span class="use-chip">
+                <%= item %>
+                </span>
+
+                <% }) %>
+
+                </div>
+
+                </div>
+
+                <% } %>
 
                 <div class="image-specs">
 
@@ -326,38 +377,139 @@
                   <table class="image-spec-table">
 
                     <tr>
-                      <td>Category</td>
-                      <td><%= typeof category !== 'undefined' ? category : 'Stock Images' %></td>
+                        <td>Category</td>
+                        <td><%= category %></td>
+                    </tr>
+
+                    <% if(secondaryCategory){ %>
+                    <tr>
+                        <td>Sub Category</td>
+                        <td><%= secondaryCategory %></td>
+                    </tr>
+                    <% } %>
+
+                    <tr>
+                        <td>Resolution</td>
+                        <td><%= width %> × <%= height %> pixels</td>
                     </tr>
 
                     <tr>
-                      <td>Resolution</td>
-                      <td><%= width %> × <%= height %></td>
+                        <td>Orientation</td>
+                        <td>
+                            <%= width > height ? "Landscape" :
+                                height > width ? "Portrait" :
+                                "Square" %>
+                        </td>
                     </tr>
 
                     <tr>
-                      <td>Orientation</td>
-                      <td>
-                        <%= width > height ? "Landscape" :
-                            height > width ? "Portrait" :
-                            "Square" %>
-                      </td>
+                        <td>Format</td>
+                        <td>JPG</td>
                     </tr>
 
                     <tr>
-                      <td>Format</td>
-                      <td>JPG</td>
+                        <td>License</td>
+                        <td>Free for Personal & Commercial Use</td>
                     </tr>
 
                     <tr>
-                      <td>License</td>
-                      <td>Free Personal & Commercial Use</td>
+                        <td>AI Description</td>
+                        <td>Human-readable SEO content</td>
+                    </tr>
+
+                    <tr>
+                        <td>Keywords</td>
+                        <td><%= keywords.length %></td>
                     </tr>
 
                   </table>
 
                 </div>
 
+                <% if(useCases && useCases.length){ %>
+
+                <div class="recommended-uses">
+
+                    <h2>Recommended Uses</h2>
+
+                    <p>
+                        This image can be used across different creative and commercial projects.
+                    </p>
+
+                    <div class="usecase-grid">
+
+                        <% useCases.forEach(item => { %>
+
+                            <span class="usecase-chip">
+                                <%= item %>
+                            </span>
+
+                        <% }) %>
+
+                    </div>
+
+                </div>
+
+                <% } %
+
+                <div class="image-details">
+
+                    <h2>Image Details</h2>
+
+                    <div class="details-grid">
+
+                        <div class="detail-card">
+                            <span class="label">Category</span>
+                            <span class="value"><%= category %></span>
+                        </div>
+
+                        <% if(secondaryCategory){ %>
+                        <div class="detail-card">
+                            <span class="label">Sub Category</span>
+                            <span class="value"><%= secondaryCategory %></span>
+                        </div>
+                        <% } %>
+
+                        <div class="detail-card">
+                            <span class="label">Resolution</span>
+                            <span class="value"><%= width %> × <%= height %></span>
+                        </div>
+
+                        <div class="detail-card">
+                            <span class="label">Orientation</span>
+                            <span class="value">
+                                <%= width > height ? "Landscape" :
+                                    height > width ? "Portrait" :
+                                    "Square" %>
+                            </span>
+                        </div>
+
+                        <div class="detail-card">
+                            <span class="label">File Format</span>
+                            <span class="value">JPG</span>
+                        </div>
+
+                        <div class="detail-card">
+                            <span class="label">License</span>
+                            <span class="value">Free Commercial Use</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="spec-note">
+
+                <p>
+
+                The image is available in its original resolution and can be downloaded
+                for websites, blog articles, social media graphics, presentations,
+                marketing materials, digital designs, wallpapers, print projects and
+                other creative work.
+
+                </p>
+
+                </div>
 
                 <div class="seo-links">
 
@@ -378,22 +530,35 @@
           </div>
 
           <!-- TAGS -->
-          <div class="top-tags-row">
+          <% if(keywords && keywords.length){ %>
 
-            <% keywords.slice(0,8).forEach(k => { %>
+          <div class="popular-tags">
 
-              <a
-                href="/search.html?query=<%= encodeURIComponent(k) %>"
-                class="top-tag-chip"
-              >
-                <%= k %>
-              </a>
+              <h2>Popular Tags</h2>
 
-            <% }) %>
+              <p>
+                  Browse related topics and discover more images with similar themes.
+              </p>
+
+              <div class="tag-grid">
+
+                  <% keywords.slice(0,15).forEach(tag=>{ %>
+
+                      <a
+                          href="/search?q=<%= encodeURIComponent(tag) %>"
+                          class="tag-chip">
+
+                          <%= tag %>
+
+                      </a>
+
+                  <% }) %>
+
+              </div>
 
           </div>
 
-        </div>
+          <% } %>
 
         <!-- ================================= -->
         <!-- RIGHT SIDEBAR -->
