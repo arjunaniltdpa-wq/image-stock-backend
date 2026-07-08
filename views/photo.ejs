@@ -364,138 +364,6 @@
 
                 <% }) %>
 
-                </div>
-
-                </div>
-
-                <% } %>
-
-                <div class="image-specs">
-
-                  <h3>Image Specifications</h3>
-
-                  <table class="image-spec-table">
-
-                    <tr>
-                        <td>Category</td>
-                        <td><%= category %></td>
-                    </tr>
-
-                    <% if(secondaryCategory){ %>
-                    <tr>
-                        <td>Sub Category</td>
-                        <td><%= secondaryCategory %></td>
-                    </tr>
-                    <% } %>
-
-                    <tr>
-                        <td>Resolution</td>
-                        <td><%= width %> × <%= height %> pixels</td>
-                    </tr>
-
-                    <tr>
-                        <td>Orientation</td>
-                        <td>
-                            <%= width > height ? "Landscape" :
-                                height > width ? "Portrait" :
-                                "Square" %>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Format</td>
-                        <td><%= image.format || "JPG" %></td>
-                    </tr>
-
-                    <tr>
-                        <td>License</td>
-                        <td>Free for Personal & Commercial Use</td>
-                    </tr>
-
-                    <tr>
-                        <td>AI Description</td>
-                        <td>Human-readable SEO content</td>
-                    </tr>
-
-                    <tr>
-                        <td>Keywords</td>
-                        <td><%= keywords.length %></td>
-                    </tr>
-
-                  </table>
-
-                </div>
-
-                <% if(useCases && useCases.length){ %>
-
-                <div class="recommended-uses">
-
-                    <h2>Recommended Uses</h2>
-
-                    <p>
-                        This image can be used across different creative and commercial projects.
-                    </p>
-
-                    <div class="usecase-grid">
-
-                        <% useCases.forEach(item => { %>
-
-                            <span class="usecase-chip">
-                                <%= item %>
-                            </span>
-
-                        <% }) %>
-
-                    </div>
-
-                </div>
-
-                <% } %>
-
-                <div class="image-details">
-
-                    <h2>Image Details</h2>
-
-                    <div class="details-grid">
-
-                        <div class="detail-card">
-                            <span class="label">Category</span>
-                            <span class="value"><%= category %></span>
-                        </div>
-
-                        <% if(secondaryCategory){ %>
-                        <div class="detail-card">
-                            <span class="label">Sub Category</span>
-                            <span class="value"><%= secondaryCategory %></span>
-                        </div>
-                        <% } %>
-
-                        <div class="detail-card">
-                            <span class="label">Resolution</span>
-                            <span class="value"><%= width %> × <%= height %></span>
-                        </div>
-
-                        <div class="detail-card">
-                            <span class="label">Orientation</span>
-                            <span class="value">
-                                <%= image.orientation %>
-                            </span>
-                        </div>
-
-                        <div class="detail-card">
-                            <span class="label">File Format</span>
-                            <span class="value">JPG</span>
-                        </div>
-
-                        <div class="detail-card">
-                            <span class="label">License</span>
-                            <span class="value">Free Commercial Use</span>
-                        </div>
-
-                    </div>
-
-                </div>
-
                 <div class="spec-note">
 
                 <p>
@@ -596,77 +464,88 @@
             </div>
 
             <!-- META -->
-            <div class="premium-meta-grid">
+            <!-- IMAGE DETAILS -->
+            <div class="sidebar-image-details">
 
-              <div class="meta-box">
+                <h3 class="sidebar-title">
+                    Image Details
+                </h3>
 
-                <span>
-                  Resolution
-                </span>
+                <table class="sidebar-details-table">
 
-                <strong id="real-resolution">
-                  Loading...
-                </strong>
+                    <tr>
+                        <td>Category</td>
+                        <td><%= category %></td>
+                    </tr>
 
-              </div>
+                    <% if(secondaryCategory){ %>
+                    <tr>
+                        <td>Sub Category</td>
+                        <td><%= secondaryCategory %></td>
+                    </tr>
+                    <% } %>
 
-              <div class="meta-box">
+                    <tr>
+                        <td>Resolution</td>
+                        <td><%= width %> × <%= height %> px</td>
+                    </tr>
 
-                <span>
-                  Format
-                </span>
+                    <tr>
+                        <td>Orientation</td>
+                        <td><%= image.orientation || (width > height ? "Landscape" : height > width ? "Portrait" : "Square") %></td>
+                    </tr>
 
-                <strong>
-                  JPG
-                </strong>
+                    <tr>
+                        <td>Format</td>
+                        <td><%= image.format || "JPG" %></td>
+                    </tr>
 
-              </div>
+                    <tr>
+                        <td>Quality</td>
+                        <td>
 
-              <div class="meta-box">
+                            <% if(width >= 7680 || height >= 4320){ %>
 
-                <span>
-                  License
-                </span>
+                                8K Ultra HD
 
-                <strong>
-                  Free Use
-                </strong>
+                            <% } else if(width >= 3840 || height >= 2160){ %>
 
-              </div>
+                                4K Ultra HD
 
-              <div class="meta-box">
+                            <% } else if(width >= 2560 || height >= 1440){ %>
 
-                <span>
-                  Quality
-                </span>
+                                2K QHD
 
-                <strong>
+                            <% } else if(width >= 1920 || height >= 1080){ %>
 
-                  <% if (width >= 3840 || height >= 2160) { %>
+                                Full HD
 
-                    4K Ultra HD
+                            <% } else { %>
 
-                  <% } else if (width >= 2560 || height >= 1440) { %>
+                                HD
 
-                    2K QHD
+                            <% } %>
 
-                  <% } else if (width >= 1920 || height >= 1080) { %>
+                        </td>
+                    </tr>
 
-                    Full HD
+                    <tr>
+                        <td>File Size</td>
+                        <td>
 
-                  <% } else if (width >= 1280 || height >= 720) { %>
+                            <%= image.size
+                                ? (image.size / 1024 / 1024).toFixed(2) + " MB"
+                                : "-" %>
 
-                    HD
+                        </td>
+                    </tr>
 
-                  <% } else { %>
+                    <tr>
+                        <td>License</td>
+                        <td>Free Commercial Use</td>
+                    </tr>
 
-                    Standard Resolution
-
-                  <% } %>
-
-                </strong>
-
-              </div>
+                </table>
 
             </div>
 
