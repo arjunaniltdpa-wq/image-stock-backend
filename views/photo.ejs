@@ -16,7 +16,7 @@
 
   <!-- OG TAGS SERVED BY BACKEND -->
   <meta name="twitter:image" content="<%= previewUrl %>">
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="website">
   <meta property="og:url" content="https://pixeora.com/photo/<%= raw %>">
   <meta property="og:title" content="<%= title %>">
   <meta property="og:description" content="<%= desc %>">
@@ -76,15 +76,15 @@
     "name": "<%= title %>",
     "description": "<%= desc %>",
 
-    "contentUrl": "<%= previewUrl %>",
-    "thumbnailUrl": "<%= thumbUrl %>",
+    "contentUrl": "<%= originalUrl %>",
+    "thumbnailUrl": "<%= previewUrl %>",
 
     "url": "https://pixeora.com/photo/<%= raw %>",
 
     "width": "<%= width %>",
     "height": "<%= height %>",
 
-    "encodingFormat": "image/webp",
+    "encodingFormat": "image/jpeg",
 
     "creator": {
       "@type": "Organization",
@@ -928,12 +928,6 @@ async function loadImageDetails() {
           mainImg.style.aspectRatio =
             `${finalImg.naturalWidth}/${finalImg.naturalHeight}`;
 
-          if (typeof ld !== "undefined") {
-            ld.width = finalImg.naturalWidth;
-            ld.height = finalImg.naturalHeight;
-
-            if (ldEl) ldEl.textContent = JSON.stringify(ld);
-          }
         }
       };
     }
@@ -995,70 +989,6 @@ async function loadImageDetails() {
 
     }
 
-    // Create schema FIRST
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "ImageObject",
-
-      "name": safeTitle,
-      "description": img.description || safeTitle,
-
-      "contentUrl": previewUrl || thumbUrl,
-      "width": img.width,
-      "height": img.height,
-      "thumbnailUrl": thumbUrl,
-
-      "url": window.location.href,
-      "representativeOfPage": true,
-
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": window.location.href
-      },
-
-      "creator": {
-        "@type": "Organization",
-        "name": "Pixeora",
-        "url": "https://pixeora.com"
-      },
-
-      "creditText": "Pixeora Photo",
-      "license": "https://pixeora.com/license",
-      "acquireLicensePage": "https://pixeora.com/license"
-    };
-
-    const breadcrumbSchema = {
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": "https://pixeora.com"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "stock image",
-          "item": "https://pixeora.com"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": safeTitle,
-          "item": window.location.href
-        }
-      ]
-    };
-
-    const breadcrumbScript = document.createElement("script");
-    breadcrumbScript.type = "application/ld+json";
-    breadcrumbScript.textContent = JSON.stringify(breadcrumbSchema);
-    document.head.appendChild(breadcrumbScript);
-
-    const ldEl = document.getElementById("ld-json");
-    if (ldEl) ldEl.textContent = JSON.stringify(ld);
 
     // Keywords
     const keywords =

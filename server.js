@@ -342,6 +342,7 @@ async function uploadLocalFolderToR2() {
         fileName: uniqueName,
         thumbnailFileName: thumbName,
         previewFileName: previewName,
+        format: ext,
         url: buildR2PublicUrl(uniqueName),
         thumbnailUrl: buildR2PublicUrl(thumbName),
         previewUrl: buildR2PublicUrl(previewName),
